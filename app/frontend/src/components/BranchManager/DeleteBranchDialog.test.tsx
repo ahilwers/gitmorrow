@@ -20,7 +20,7 @@ const api = vi.hoisted(() => ({ PrepareBranchDeletion: vi.fn(), DeleteBranch: vi
 vi.mock('@bindings/gitmorrow/app', () => api)
 const local = { name: 'topic', remote: '', isRemote: false, repo: '/repo', worktree: '/repo' }
 const remote = { ...local, name: 'origin/topic', remote: 'origin', isRemote: true }
-const snapshot = (target = local, merged = true) => ({ repoPath: '/repo', name: target.name, remote: target.remote, ref: 'refs/heads/topic', oid: 'a'.repeat(40), destination: target.isRemote ? 'origin (example.com)' : 'Local branch', configFingerprint: '', merged })
+const snapshot = (target = local) => ({ repoPath: '/repo', name: target.name, remote: target.remote, ref: 'refs/heads/topic', oid: 'a'.repeat(40), destination: target.isRemote ? 'origin (example.com)' : 'Local branch', configFingerprint: '' })
 function open(target = local) {
   const client = new QueryClient()
   const invalidate = vi.spyOn(client, 'invalidateQueries')
@@ -53,7 +53,7 @@ describe('branch deletion confirmation', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus()
     fireEvent.click(screen.getByRole('button', { name: 'Delete Branch' }))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
-    expect(api.DeleteBranch).toHaveBeenCalledWith(snapshot(), false)
+    expect(api.DeleteBranch).toHaveBeenCalledWith(snapshot())
     for (const key of ['branches', 'commits', 'status', 'worktrees']) expect(invalidate).toHaveBeenCalledWith({ queryKey: [key] })
   })
   it('shows the remote server ref, destination and OID before confirmation', async () => {
@@ -96,36 +96,6 @@ describe('branch deletion confirmation', () => {
     await screen.findByText(/refs\/heads\/topic/)
     fireEvent.click(screen.getByRole('button', { name: 'Delete Branch' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('not merged')
-  })
-  it('offers a forced deletion after Git refused an unmerged branch', async () => {
-    api.PrepareBranchDeletion.mockResolvedValue(snapshot(local, false))
-    api.DeleteBranch.mockRejectedValueOnce("git branch failed (exit 1)\nerror: the branch 'topic' is not fully merged")
-    const { onClose } = open()
-    await screen.findByText(/refs\/heads\/topic/)
-    expect(screen.queryByText(/only this branch contains/)).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Branch' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('not fully merged')
-    expect(screen.getByText(/only this branch contains/)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Delete Branch' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Anyway' }))
-    await waitFor(() => expect(onClose).toHaveBeenCalled())
-    expect(api.DeleteBranch).toHaveBeenLastCalledWith(snapshot(local, false), true)
-  })
-  it('does not offer a forced deletion for a merged or a remote branch', async () => {
-    api.DeleteBranch.mockRejectedValue('git branch failed (exit 1)\nfatal: cannot delete branch')
-    const view = open()
-    await screen.findByText(/refs\/heads\/topic/)
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Branch' }))
-    await screen.findByRole('alert')
-    expect(screen.queryByRole('button', { name: 'Delete Anyway' })).not.toBeInTheDocument()
-    view.unmount()
-
-    api.PrepareBranchDeletion.mockResolvedValue(snapshot(remote, false))
-    open(remote)
-    await screen.findByText(/Server ref/)
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Branch' }))
-    await screen.findByRole('alert')
-    expect(screen.queryByRole('button', { name: 'Delete Anyway' })).not.toBeInTheDocument()
   })
   it('closes on context switch and ignores late prepare results', async () => {
     let resolve!: (value: ReturnType<typeof snapshot>) => void

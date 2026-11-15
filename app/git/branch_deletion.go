@@ -29,11 +29,6 @@ import (
 // contains a redacted label and a short hash identifying a complete network URL.
 // ConfigFingerprint hashes the remote, fetch refspec, effective push/fetch URLs,
 // tracking ref and its OID; it is empty for local branch deletion.
-//
-// Merged mirrors the check behind git branch -d: it is false when the local
-// branch is neither merged into its upstream nor into HEAD, so the deletion is
-// refused unless it is forced. It is always true for remote branches, where the
-// check does not apply.
 type BranchDeletionInfo struct {
 	RepoPath          string `json:"repoPath"`
 	Name              string `json:"name"`
@@ -42,16 +37,6 @@ type BranchDeletionInfo struct {
 	OID               string `json:"oid"`
 	Destination       string `json:"destination"`
 	ConfigFingerprint string `json:"configFingerprint"`
-	Merged            bool   `json:"merged"`
-}
-
-// sameDeletion compares a confirmed snapshot with a freshly prepared one.
-// Merged is derived from the branch tip and the current upstream, so a tip that
-// moved is already caught by OID; comparing it would reject a valid snapshot
-// only because the branch became merged in the meantime.
-func (info BranchDeletionInfo) sameDeletion(current BranchDeletionInfo) bool {
-	current.Merged = info.Merged
-	return current == info
 }
 
 var deletionOID = regexp.MustCompile(`^(?:[0-9a-f]{40}|[0-9a-f]{64})$`)
@@ -118,29 +103,6 @@ func deletionRefOID(dir, ref string) (string, error) {
 	return oid, nil
 }
 
-// localBranchMerged mirrors the check that git branch -d performs: a branch
-// with an upstream is merged when it is an ancestor of that upstream, otherwise
-// when it is an ancestor of HEAD. Only a code 1 from merge-base means "not an
-// ancestor"; any other failure is reported, because the deletion decision must
-// not be guessed.
-func localBranchMerged(dir, branch, ref string) (bool, error) {
-	target := "HEAD"
-	if out, err := CLI(dir, "rev-parse", "--abbrev-ref", "--symbolic-full-name", branch+"@{upstream}"); err == nil {
-		if upstream := strings.TrimSpace(out); upstream != "" {
-			target = upstream
-		}
-	}
-	_, err := CLI(dir, "merge-base", "--is-ancestor", ref, target)
-	if err == nil {
-		return true, nil
-	}
-	var failure *Failure
-	if errors.As(err, &failure) && failure.ExitCode == 1 {
-		return false, nil
-	}
-	return false, fmt.Errorf("could not determine whether the branch is merged: %w", err)
-}
-
 func (r *Repository) deletionWorktreePath() (string, error) {
 	out, err := CLI(r.Path, "rev-parse", "--show-toplevel")
 	if err != nil {
@@ -174,10 +136,6 @@ func (r *Repository) PrepareBranchDeletion(name, remote string) (BranchDeletionI
 	}
 	if remote == "" {
 		info.OID, err = deletionRefOID(r.Path, info.Ref)
-		if err != nil {
-			return info, err
-		}
-		info.Merged, err = localBranchMerged(r.Path, branch, info.Ref)
 		info.Destination = "Local branch"
 		return info, err
 	}
@@ -243,17 +201,13 @@ func (r *Repository) PrepareBranchDeletion(name, remote string) (BranchDeletionI
 		return info, fmt.Errorf("remote branch does not exist or is ambiguous")
 	}
 	info.OID = parts[0]
-	// The merged check does not apply to a branch on the server.
-	info.Merged = true
 	return info, nil
 }
 
 // DeleteBranch revalidates every snapshot field before deleting. Git itself
 // checks worktree usage and merged status for local branches; the server checks
 // the exact confirmed object ID atomically using a lease for remote branches.
-// force uses git branch -D for a local branch, which still refuses a branch
-// that is checked out in a worktree.
-func (r *Repository) DeleteBranch(info BranchDeletionInfo, force bool) error {
+func (r *Repository) DeleteBranch(info BranchDeletionInfo) error {
 	path, err := r.deletionWorktreePath()
 	if err != nil {
 		return err
@@ -265,19 +219,12 @@ func (r *Repository) DeleteBranch(info BranchDeletionInfo, force bool) error {
 	if err != nil {
 		return err
 	}
-	if !info.sameDeletion(current) {
+	if current != info {
 		return fmt.Errorf("branch, repository, or remote configuration changed; prepare deletion again")
 	}
 	if info.Remote == "" {
-		flag := "-d"
-		if force {
-			flag = "-D"
-		}
-		_, err = CLI(r.Path, "branch", flag, "--", info.Name)
+		_, err = CLI(r.Path, "branch", "-d", "--", info.Name)
 		return err
-	}
-	if force {
-		return fmt.Errorf("forced deletion is only supported for local branches")
 	}
 	urls, err := CLI(r.Path, "remote", "get-url", "--push", "--all", "--", info.Remote)
 	if err != nil {

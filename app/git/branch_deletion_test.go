@@ -81,7 +81,7 @@ func TestDeleteLocalBranchSafety(t *testing.T) {
 	if info.Ref != "refs/heads/merged" || info.RepoPath != actualDir || info.OID == "" {
 		t.Fatalf("bad snapshot: %+v", info)
 	}
-	if err := repo.DeleteBranch(info, false); err != nil {
+	if err := repo.DeleteBranch(info); err != nil {
 		t.Fatal(err)
 	}
 	assertRef(t, dir, "refs/heads/merged", false)
@@ -89,7 +89,7 @@ func TestDeleteLocalBranchSafety(t *testing.T) {
 	deletionGit(t, dir, "checkout", "-b", "unmerged")
 	deletionGit(t, dir, "commit", "--allow-empty", "-m", "unmerged")
 	deletionGit(t, dir, "checkout", "main")
-	if err := repo.DeleteBranch(mustPrepareDeletion(t, repo, "unmerged", ""), false); err == nil {
+	if err := repo.DeleteBranch(mustPrepareDeletion(t, repo, "unmerged", "")); err == nil {
 		t.Fatal("deleted unmerged branch")
 	}
 	assertRef(t, dir, "refs/heads/unmerged", true)
@@ -97,7 +97,7 @@ func TestDeleteLocalBranchSafety(t *testing.T) {
 	deletionGit(t, dir, "branch", "checked")
 	wt := filepath.Join(t.TempDir(), "worktree")
 	deletionGit(t, dir, "worktree", "add", wt, "checked")
-	if err := repo.DeleteBranch(mustPrepareDeletion(t, repo, "checked", ""), false); err == nil {
+	if err := repo.DeleteBranch(mustPrepareDeletion(t, repo, "checked", "")); err == nil {
 		t.Fatal("deleted branch checked out in another worktree")
 	}
 	assertRef(t, dir, "refs/heads/checked", true)
@@ -106,7 +106,7 @@ func TestDeleteLocalBranchSafety(t *testing.T) {
 	stale := mustPrepareDeletion(t, repo, "stale", "")
 	deletionGit(t, dir, "commit", "--allow-empty", "-m", "advance")
 	deletionGit(t, dir, "branch", "-f", "stale", "main")
-	if err := repo.DeleteBranch(stale, false); err == nil {
+	if err := repo.DeleteBranch(stale); err == nil {
 		t.Fatal("deleted changed branch")
 	}
 	assertRef(t, dir, "refs/heads/stale", true)
@@ -117,67 +117,9 @@ func TestDeleteLocalBranchSafety(t *testing.T) {
 	}
 	forged := mustPrepareDeletion(t, repo, "stale", "")
 	forged.RepoPath = wt
-	if err := repo.DeleteBranch(forged, false); err == nil {
+	if err := repo.DeleteBranch(forged); err == nil {
 		t.Fatal("accepted changed repository")
 	}
-}
-
-func TestBranchDeletionMergedState(t *testing.T) {
-	dir, repo := deletionRepo(t)
-	deletionGit(t, dir, "branch", "at-head")
-	if info := mustPrepareDeletion(t, repo, "at-head", ""); !info.Merged {
-		t.Fatalf("branch at HEAD reported as unmerged: %+v", info)
-	}
-
-	deletionGit(t, dir, "checkout", "-b", "own-work")
-	deletionGit(t, dir, "commit", "--allow-empty", "-m", "own work")
-	deletionGit(t, dir, "branch", "--set-upstream-to=main", "own-work")
-	deletionGit(t, dir, "checkout", "main")
-	if info := mustPrepareDeletion(t, repo, "own-work", ""); info.Merged {
-		t.Fatalf("branch with commits of its own reported as merged: %+v", info)
-	}
-	// Merged into its upstream even though HEAD moved on: git branch -d accepts.
-	deletionGit(t, dir, "branch", "behind")
-	deletionGit(t, dir, "branch", "--set-upstream-to=main", "behind")
-	deletionGit(t, dir, "commit", "--allow-empty", "-m", "advance main")
-	if info := mustPrepareDeletion(t, repo, "behind", ""); !info.Merged {
-		t.Fatalf("branch merged into its upstream reported as unmerged: %+v", info)
-	}
-
-	deletionGit(t, dir, "checkout", "-b", "diverged")
-	deletionGit(t, dir, "commit", "--allow-empty", "-m", "own work")
-	deletionGit(t, dir, "checkout", "main")
-	if info := mustPrepareDeletion(t, repo, "diverged", ""); info.Merged {
-		t.Fatalf("diverged branch reported as merged: %+v", info)
-	}
-}
-
-func TestForcedLocalBranchDeletion(t *testing.T) {
-	dir, repo := deletionRepo(t)
-	deletionGit(t, dir, "checkout", "-b", "unmerged")
-	deletionGit(t, dir, "commit", "--allow-empty", "-m", "own work")
-	deletionGit(t, dir, "checkout", "main")
-	info := mustPrepareDeletion(t, repo, "unmerged", "")
-	if info.Merged {
-		t.Fatalf("unmerged branch reported as merged: %+v", info)
-	}
-	if err := repo.DeleteBranch(info, false); err == nil {
-		t.Fatal("unforced deletion removed an unmerged branch")
-	}
-	assertRef(t, dir, "refs/heads/unmerged", true)
-	if err := repo.DeleteBranch(info, true); err != nil {
-		t.Fatalf("forced deletion failed: %v", err)
-	}
-	assertRef(t, dir, "refs/heads/unmerged", false)
-
-	// Force does not override the worktree guard.
-	deletionGit(t, dir, "branch", "checked")
-	wt := filepath.Join(t.TempDir(), "worktree")
-	deletionGit(t, dir, "worktree", "add", wt, "checked")
-	if err := repo.DeleteBranch(mustPrepareDeletion(t, repo, "checked", ""), true); err == nil {
-		t.Fatal("forced deletion removed a branch checked out in another worktree")
-	}
-	assertRef(t, dir, "refs/heads/checked", true)
 }
 
 func deletionRemoteFixture(t *testing.T) (string, string, string, *git.Repository) {
@@ -249,10 +191,7 @@ func TestDeleteRemoteUsesOnlyPushDestination(t *testing.T) {
 	if info.Ref != "refs/heads/feature/deep" || !strings.Contains(info.Destination, push) || strings.Contains(info.Destination, fetch) {
 		t.Fatalf("bad push destination snapshot: %+v", info)
 	}
-	if err := repo.DeleteBranch(info, true); err == nil {
-		t.Fatal("accepted forced deletion of a remote branch")
-	}
-	if err := repo.DeleteBranch(info, false); err != nil {
+	if err := repo.DeleteBranch(info); err != nil {
 		t.Fatal(err)
 	}
 	assertRef(t, push, "refs/heads/feature/deep", false)
@@ -274,7 +213,7 @@ func TestDeleteRemoteRemovesTrackingRefForMatchingDestinations(t *testing.T) {
 	dir, fetch, _, repo := deletionRemoteFixture(t)
 	deletionGit(t, dir, "config", "remote.origin.pushurl", fetch)
 	info := mustPrepareDeletion(t, repo, "origin/feature/deep", "origin")
-	if err := repo.DeleteBranch(info, false); err != nil {
+	if err := repo.DeleteBranch(info); err != nil {
 		t.Fatal(err)
 	}
 	assertRef(t, fetch, "refs/heads/feature/deep", false)
@@ -285,7 +224,7 @@ func TestDeleteRemoteMultipleFetchURLsKeepTrackingRef(t *testing.T) {
 	dir, fetch, _, repo := deletionRemoteFixture(t)
 	deletionGit(t, dir, "config", "remote.origin.pushurl", fetch)
 	deletionGit(t, dir, "config", "--add", "remote.origin.url", filepath.Join(t.TempDir(), "second-fetch.git"))
-	if err := repo.DeleteBranch(mustPrepareDeletion(t, repo, "origin/feature/deep", "origin"), false); err != nil {
+	if err := repo.DeleteBranch(mustPrepareDeletion(t, repo, "origin/feature/deep", "origin")); err != nil {
 		t.Fatal(err)
 	}
 	assertRef(t, fetch, "refs/heads/feature/deep", false)
@@ -304,7 +243,7 @@ func TestDeleteRemoteCleanupPreservesRefreshedTrackingRef(t *testing.T) {
 	if err := os.WriteFile(hook, []byte("#!/bin/sh\ngit update-ref refs/remotes/origin/feature/deep "+newOID+"\n"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.DeleteBranch(info, false); err != nil {
+	if err := repo.DeleteBranch(info); err != nil {
 		t.Fatal(err)
 	}
 	assertRef(t, fetch, "refs/heads/feature/deep", false)
@@ -318,13 +257,13 @@ func TestDeleteRemoteRejectsStaleAndUnsafeConfiguration(t *testing.T) {
 	info := mustPrepareDeletion(t, repo, "origin/feature/deep", "origin")
 	deletionGit(t, dir, "commit", "--allow-empty", "-m", "new tip")
 	deletionGit(t, dir, "push", push, "HEAD:refs/heads/feature/deep")
-	if err := repo.DeleteBranch(info, false); err == nil {
+	if err := repo.DeleteBranch(info); err == nil {
 		t.Fatal("accepted stale server OID")
 	}
 	assertRef(t, push, "refs/heads/feature/deep", true)
 	info = mustPrepareDeletion(t, repo, "origin/feature/deep", "origin")
 	deletionGit(t, dir, "config", "--add", "remote.origin.pushurl", filepath.Join(t.TempDir(), "other.git"))
-	if err := repo.DeleteBranch(info, false); err == nil {
+	if err := repo.DeleteBranch(info); err == nil {
 		t.Fatal("accepted multiple push URLs")
 	}
 	if _, err := repo.PrepareBranchDeletion("origin/feature/deep", "origin"); err == nil {
@@ -334,7 +273,7 @@ func TestDeleteRemoteRejectsStaleAndUnsafeConfiguration(t *testing.T) {
 	deletionGit(t, dir, "config", "--add", "remote.origin.pushurl", push)
 	info = mustPrepareDeletion(t, repo, "origin/feature/deep", "origin")
 	deletionGit(t, dir, "config", "remote.origin.pushurl", filepath.Join(t.TempDir(), "changed.git"))
-	if err := repo.DeleteBranch(info, false); err == nil {
+	if err := repo.DeleteBranch(info); err == nil {
 		t.Fatal("accepted changed push URL")
 	}
 	deletionGit(t, dir, "config", "remote.origin.pushurl", push)
@@ -368,7 +307,7 @@ func TestDeleteRemoteLeaseRejectsRaceDuringPush(t *testing.T) {
 	if err := os.WriteFile(hook, []byte("#!/bin/sh\ngit --git-dir="+quotedPush+" update-ref refs/heads/feature/deep "+newOID+"\n"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.DeleteBranch(info, false); err == nil {
+	if err := repo.DeleteBranch(info); err == nil {
 		t.Fatal("lease allowed deletion after a concurrent server update")
 	}
 	if got := deletionGit(t, push, "rev-parse", "refs/heads/feature/deep"); got != newOID {
@@ -409,7 +348,7 @@ func TestDeleteRemoteServerRejection(t *testing.T) {
 	if err := os.WriteFile(hook, []byte("#!/bin/sh\necho rejected >&2\nexit 1\n"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.DeleteBranch(info, false); err == nil || !strings.Contains(err.Error(), "rejected") {
+	if err := repo.DeleteBranch(info); err == nil || !strings.Contains(err.Error(), "rejected") {
 		t.Fatalf("expected rejection, got %v", err)
 	}
 	assertRef(t, push, "refs/heads/feature/deep", true)

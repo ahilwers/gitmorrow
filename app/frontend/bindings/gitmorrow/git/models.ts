@@ -27,11 +27,6 @@ export interface Branch {
  * contains a redacted label and a short hash identifying a complete network URL.
  * ConfigFingerprint hashes the remote, fetch refspec, effective push/fetch URLs,
  * tracking ref and its OID; it is empty for local branch deletion.
- *
- * Merged mirrors the check behind git branch -d: it is false when the local
- * branch is neither merged into its upstream nor into HEAD, so the deletion is
- * refused unless it is forced. It is always true for remote branches, where the
- * check does not apply.
  */
 export interface BranchDeletionInfo {
     "repoPath": string;
@@ -41,7 +36,6 @@ export interface BranchDeletionInfo {
     "oid": string;
     "destination": string;
     "configFingerprint": string;
-    "merged": boolean;
 }
 
 /**
