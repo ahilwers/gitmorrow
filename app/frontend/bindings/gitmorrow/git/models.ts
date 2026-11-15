@@ -241,7 +241,6 @@ export interface MergeState {
 }
 
 export interface PullResult {
-    "diagnosticID"?: string;
 
     /**
      * success | choice | conflict
