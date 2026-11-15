@@ -6,7 +6,8 @@
 
 <p align="center">
   <strong>The Git Client Of Tomorrow</strong><br>
-  A fast, native Git client for macOS, Windows, and Linux — free to use and built for developers.
+  A fast, native Git client for macOS, Windows, and Linux — free to use and built for developers.<br>
+  <a href="https://gitmorrow.org">gitmorrow.org</a>
 </p>
 
 <p align="center">
@@ -23,6 +24,9 @@ first-class working-copy experience: fast, native, and focused on your workflow.
 
 GitMorrow is **free software**: free to use, free to modify, and free to share — your repositories
 stay on your machine, and no account is required.
+
+The project website with screenshots, a feature overview, and download links is
+**[gitmorrow.org](https://gitmorrow.org)**.
 
 > **Status:** GitMorrow is in active development and still pre-1.0. Preview builds for all three
 > platforms are published on the [Releases page](https://github.com/ahilwers/gitmorrow/releases/latest);
