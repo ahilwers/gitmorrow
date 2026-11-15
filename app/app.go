@@ -450,13 +450,14 @@ func (a *App) DiscardStagedFiles(filePaths []string) error {
 }
 
 // DeleteBranch deletes only the branch described by the confirmed snapshot.
-func (a *App) DeleteBranch(info gitpkg.BranchDeletionInfo) error {
+// force deletes a local branch even when it is not fully merged.
+func (a *App) DeleteBranch(info gitpkg.BranchDeletionInfo, force bool) error {
 	a.pullMu.Lock()
 	defer a.pullMu.Unlock()
 	if a.repo == nil {
 		return gitpkg.ErrNotARepo
 	}
-	if err := a.repo.DeleteBranch(info); err != nil {
+	if err := a.repo.DeleteBranch(info, force); err != nil {
 		return err
 	}
 	a.emitRepoChanged(a.repo.Path)
