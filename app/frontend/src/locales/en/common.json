@@ -46,6 +46,7 @@
     "pushPending_other": "Push — {{count}} unpushed commits (compared with upstream)",
     "branch": "Branch",
     "currentBranch": "Current branch: {{branch}}",
+    "currentWorktree": "Current worktree: {{path}}",
     "detachedHead": "Detached HEAD",
     "stash": "Stash",
     "tag": "Tag"
@@ -53,6 +54,9 @@
   "views": {
     "history": "History",
     "changes": "Changes"
+  },
+  "changesView": {
+    "resizeFileList": "Resize file list"
   },
   "deleteBranch": {
     "localMenu": "Delete local branch",
@@ -83,7 +87,8 @@
     "tags": "Tags",
     "stashes": "Stashes",
     "worktrees": "Worktrees",
-    "newWorktree": "New Worktree"
+    "newWorktree": "New Worktree",
+    "resizeWidth": "Resize sidebar"
   },
   "staging": {
     "unstaged": "Unstaged",
@@ -96,6 +101,16 @@
     "commitMessage": "Commit message (\u2318 + Enter to commit)\u2026",
     "amend": "Amend",
     "commit": "Commit"
+  },
+  "fileSelection": {
+    "toolbar": "Selected files",
+    "count": "{{count}} selected",
+    "stage": "Stage",
+    "stageTitle": "Stage the selected files",
+    "discard": "Discard",
+    "discardTitle": "Discard the changes of the selected files",
+    "clear": "Clear",
+    "clearTitle": "Clear the selection"
   },
   "commits": {
     "selectPrompt": "Select a commit",
@@ -114,7 +129,11 @@
     "newBranch": "Branch",
     "newPath": "Path",
     "create": "Create Worktree",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "loading": "Loading worktrees…",
+    "loadError": "Could not load worktrees",
+    "empty": "No worktrees",
+    "hasUncommittedChanges": "Has uncommitted changes"
   },
   "push": {
     "createUpstream": {

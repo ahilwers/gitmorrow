@@ -42,7 +42,12 @@ type PendingConfirm =
   | { kind: 'deleteTag'; tag: string }
   | { kind: 'dropStash'; entry: StashEntry }
 
-export default function Sidebar() {
+interface SidebarProps {
+  /** Width of the sidebar in pixels. Adjustable by the user. */
+  width?: number
+}
+
+export default function Sidebar({ width = 200 }: SidebarProps) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState({
     branches: true,
@@ -76,7 +81,7 @@ export default function Sidebar() {
   const { data: worktrees, removeMutation, switchMutation } = useWorktrees()
   const { data: tags, checkoutMutation: tagCheckoutMutation, deleteMutation: tagDeleteMutation } = useTags()
   const { data: stashes, dropMutation } = useStashes()
-  const { activeWorktree, showFlash, setActiveView, isDraggingCommits, cherryPickConflictActive } = useGitStore()
+  const { activeRepo, activeWorktree, showFlash, setActiveView, isDraggingCommits, cherryPickConflictActive } = useGitStore()
   const { data: status } = useStatus()
   const { cherryPickMutation } = useCherryPick()
 
@@ -255,8 +260,9 @@ export default function Sidebar() {
   return (
     <>
       <aside
+        data-panel="sidebar"
         style={{
-          width: 200,
+          width,
           flexShrink: 0,
           background: 'var(--bg-sidebar)',
           borderRight: '1px solid var(--border-sub)',
@@ -523,7 +529,7 @@ export default function Sidebar() {
             <WorktreeItem
               key={wt.path}
               worktree={wt}
-              isActive={activeWorktree === wt.path}
+              isActive={(activeWorktree ?? activeRepo) === wt.path}
               onSwitch={() => handleSwitchWorktree(wt)}
               onRemove={() => setPending({ kind: 'removeWorktree', worktree: wt })}
               onOpenInFinder={() => OpenInFinder(wt.path).catch((err: Error) => showFlash(parseGitError(err), 'danger'))}

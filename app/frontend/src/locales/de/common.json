@@ -44,11 +44,15 @@
     "pushPending_other": "Push — {{count}} noch nicht gepushte Commits (gegenüber dem Upstream)",
     "branch": "Branch",
     "currentBranch": "Aktueller Branch: {{branch}}",
+    "currentWorktree": "Aktueller Worktree: {{path}}",
     "detachedHead": "Losgelöster HEAD",
     "stash": "Stash",
     "tag": "Tag"
   },
   "views": { "history": "Historie", "changes": "\u00c4nderungen" },
+  "changesView": {
+    "resizeFileList": "Dateiliste skalieren"
+  },
   "deleteBranch": {
     "localMenu": "Lokalen Branch l\u00f6schen",
     "remoteMenu": "Remote-Branch l\u00f6schen",
@@ -78,7 +82,8 @@
     "tags": "Tags",
     "stashes": "Stashes",
     "worktrees": "Worktrees",
-    "newWorktree": "Neuer Worktree"
+    "newWorktree": "Neuer Worktree",
+    "resizeWidth": "Seitenleiste skalieren"
   },
   "staging": {
     "unstaged": "Nicht gestaged",
@@ -91,6 +96,16 @@
     "commitMessage": "Commit-Nachricht (\u2318 + Enter zum Committen)\u2026",
     "amend": "Amend",
     "commit": "Commit"
+  },
+  "fileSelection": {
+    "toolbar": "Ausgew\u00e4hlte Dateien",
+    "count": "{{count}} ausgew\u00e4hlt",
+    "stage": "Stagen",
+    "stageTitle": "Die ausgew\u00e4hlten Dateien stagen",
+    "discard": "Verwerfen",
+    "discardTitle": "Die \u00c4nderungen der ausgew\u00e4hlten Dateien verwerfen",
+    "clear": "Auswahl aufheben",
+    "clearTitle": "Die Auswahl aufheben"
   },
   "commits": {
     "selectPrompt": "Commit ausw\u00e4hlen",
@@ -109,7 +124,11 @@
     "newBranch": "Branch",
     "newPath": "Pfad",
     "create": "Worktree erstellen",
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "loading": "Worktrees werden geladen…",
+    "loadError": "Worktrees konnten nicht geladen werden",
+    "empty": "Keine Worktrees",
+    "hasUncommittedChanges": "Enthält uncommittete Änderungen"
   },
   "push": {
     "createUpstream": {
