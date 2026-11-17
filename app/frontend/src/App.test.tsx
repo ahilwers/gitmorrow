@@ -10,9 +10,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { CreateCommit, Fetch, PullForUI, Push } from '@bindings/gitmorrow/app'
+import { CreateCommit, Fetch, PullForUI, PushToRemotes } from '@bindings/gitmorrow/app'
 import { Events } from '@wailsio/runtime'
 import { useGitStore } from '@/stores/gitStore'
 import App from './App'
@@ -63,7 +63,9 @@ describe('unrestricted application access', () => {
     await waitFor(() => expect(PullForUI).toHaveBeenCalledWith('/repo', 'main'))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Push' })).toBeEnabled())
     fireEvent.click(screen.getByRole('button', { name: 'Push' }))
-    await waitFor(() => expect(Push).toHaveBeenCalledWith('', '', false))
+    const pushDialog = await screen.findByRole('dialog', { name: 'Push branch' })
+    fireEvent.click(within(pushDialog).getByRole('button', { name: 'Push' }))
+    await waitFor(() => expect(PushToRemotes).toHaveBeenCalledWith(['origin'], true))
 
     fireEvent.click(screen.getByRole('button', { name: 'Changes' }))
     fireEvent.change(screen.getByPlaceholderText('Describe your changes…'), { target: { value: 'Test commit' } })

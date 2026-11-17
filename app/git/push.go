@@ -51,47 +51,16 @@ func (r *Repository) GetPushInfo() (PushInfo, error) {
 	return info, nil
 }
 
-// PushWithUpstream must only be called after explicit confirmation. Validate the
-// snapshot again so a checkout/repository switch while the dialog is open cannot
-// publish a different branch. Use a full refspec, never push.default or remote.*.push.
-func (r *Repository) PushWithUpstream(repoPath, remote, branch string) error {
-	if repoPath != r.Path {
-		return fmt.Errorf("repository changed; please push again")
+// PushToRemotes publishes the current branch to every selected remote. Call it
+// only after the user confirmed the remote selection and whether tags should be
+// published: a repository can reject tag creation with server-side rules, so
+// tags must never ride along unasked. The branch is always named explicitly
+// (never via push.default or remote.*.push) and the first selected remote becomes
+// the upstream when the branch has none yet.
+func (r *Repository) PushToRemotes(remotes []string, pushTags bool) error {
+	if len(remotes) == 0 {
+		return fmt.Errorf("select at least one remote to push to")
 	}
-	info, err := r.GetPushInfo()
-	if err != nil {
-		return err
-	}
-	if branch != info.Branch || info.Upstream != "" {
-		return fmt.Errorf("branch or upstream changed; please push again")
-	}
-	found := false
-	for _, name := range info.Remotes {
-		if name == remote {
-			found = true
-			break
-		}
-	}
-	if !found {
-		return fmt.Errorf("select a configured remote before creating an upstream")
-	}
-	ref := plumbing.NewBranchReferenceName(branch).String()
-	// --tags publishes every local tag alongside the branch. An ordinary push
-	// only carries tags when named explicitly, and --follow-tags would skip
-	// the lightweight tags this app creates.
-	_, err = CLI(r.Path, "push", "--set-upstream", "--tags", "--", remote, ref+":"+ref)
-	if IsAuthError(err) {
-		return fmt.Errorf("%w: %w", ErrAuthFailed, err)
-	}
-	return err
-}
-
-// PushTracked performs the default push: the current branch to its configured
-// upstream, plus all local tags. The branch is named explicitly (never via
-// push.default or remote.*.push) so that --tags adds tags on top of the branch
-// push rather than replacing it. Errors if the branch has no upstream, mirroring
-// the confirmation guard in the frontend.
-func (r *Repository) PushTracked(force bool) error {
 	head, err := r.repo.Head()
 	if err != nil {
 		return err
@@ -104,22 +73,46 @@ func (r *Repository) PushTracked(force bool) error {
 	if err != nil {
 		return err
 	}
-	b := cfg.Branches[branch]
-	if b == nil || b.Remote == "" || b.Merge == "" {
-		return fmt.Errorf("branch %q has no upstream; confirm creation before pushing", branch)
+	selected := make(map[string]bool, len(remotes))
+	for _, remote := range remotes {
+		if remote == "" {
+			return fmt.Errorf("select a configured remote before pushing")
+		}
+		if _, ok := cfg.Remotes[remote]; !ok {
+			return fmt.Errorf("remote %q is not configured", remote)
+		}
+		if selected[remote] {
+			return fmt.Errorf("remote %q selected twice", remote)
+		}
+		selected[remote] = true
 	}
-	// --tags publishes every local tag alongside the branch. An ordinary push
-	// only carries tags when named explicitly, and --follow-tags would skip
-	// the lightweight tags this app creates.
-	args := []string{"push", "--tags"}
-	if force {
-		args = append(args, "--force-with-lease")
-	}
+	tracked := cfg.Branches[branch]
+	hasUpstream := tracked != nil && tracked.Remote != "" && tracked.Merge != ""
 	src := plumbing.NewBranchReferenceName(branch).String()
-	args = append(args, b.Remote, src+":"+b.Merge.String())
-	_, err = CLI(r.Path, args...)
-	if IsAuthError(err) {
-		return fmt.Errorf("%w: %w", ErrAuthFailed, err)
+	for i, remote := range remotes {
+		dst := src
+		if hasUpstream && tracked.Remote == remote {
+			dst = tracked.Merge.String()
+		}
+		args := []string{"push"}
+		if pushTags {
+			// --tags publishes every local tag alongside the branch. An ordinary
+			// push only carries tags when named explicitly, and --follow-tags
+			// would skip the lightweight tags this app creates.
+			args = append(args, "--tags")
+		}
+		// Only the first remote may create the upstream; later remotes must not
+		// overwrite the tracking configuration.
+		if i == 0 && !hasUpstream {
+			args = append(args, "--set-upstream")
+		}
+		args = append(args, "--", remote, src+":"+dst)
+		if _, err := CLI(r.Path, args...); err != nil {
+			if IsAuthError(err) {
+				return fmt.Errorf("push to %s failed: %w: %w", remote, ErrAuthFailed, err)
+			}
+			return fmt.Errorf("push to %s failed: %w", remote, err)
+		}
 	}
-	return err
+	return nil
 }

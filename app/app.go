@@ -18,7 +18,6 @@ import (
 	"runtime"
 	"sync"
 
-	"fmt"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	gitpkg "gitmorrow/git"
 	"gitmorrow/internal/sysproc"
@@ -357,27 +356,15 @@ func (a *App) Pull(remote, branch string) error {
 	return err
 }
 
-func (a *App) Push(remote, branch string, force bool) error {
+// PushToRemotes publishes the current branch to the remotes and with the tag
+// choice the user confirmed in the push dialog. It revalidates the branch,
+// remote names and upstream on the backend so a checkout or repository switch
+// while the dialog is open cannot publish something else.
+func (a *App) PushToRemotes(remotes []string, pushTags bool) error {
 	if a.repo == nil {
 		return gitpkg.ErrNotARepo
 	}
-	if remote == "" && branch == "" {
-		// Default push of the tracked branch plus all local tags. PushTracked
-		// rechecks the upstream just before pushing so autoSetupRemote must not
-		// publish an untracked branch if it changed after the frontend preflight.
-		return a.repo.PushTracked(force)
-	}
-	// --tags adds all local tags to an explicit branch push. The branch is named
-	// explicitly so the flag cannot replace the branch refspec with tags-only.
-	args := []string{"push", remote, branch, "--tags"}
-	if force {
-		args = append(args, "--force-with-lease")
-	}
-	_, err := gitpkg.CLI(a.repo.Path, args...)
-	if gitpkg.IsAuthError(err) {
-		return fmt.Errorf("%w: %w", gitpkg.ErrAuthFailed, err)
-	}
-	return err
+	return a.repo.PushToRemotes(remotes, pushTags)
 }
 
 // GetPushInfo checks the current branch without contacting or changing a remote.
@@ -386,14 +373,6 @@ func (a *App) GetPushInfo() (gitpkg.PushInfo, error) {
 		return gitpkg.PushInfo{}, gitpkg.ErrNotARepo
 	}
 	return a.repo.GetPushInfo()
-}
-
-// PushWithUpstream publishes only the repository and branch the user confirmed.
-func (a *App) PushWithUpstream(repoPath, remote, branch string) error {
-	if a.repo == nil {
-		return gitpkg.ErrNotARepo
-	}
-	return a.repo.PushWithUpstream(repoPath, remote, branch)
 }
 
 // StoreCredentials writes credentials into the configured git credential helper.

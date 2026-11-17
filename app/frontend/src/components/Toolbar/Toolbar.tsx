@@ -17,8 +17,8 @@ import { RefreshCw, ArrowDown, ArrowUp, GitBranch, Layers, Tag, Search, ChevronD
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { useGitStore } from '@/stores/gitStore'
 import { useStatus } from '@/hooks/useStatus'
-import { SelectRepository, OpenRepository, Fetch, PullForUI, ResolvePull, Push, GetPushInfo, PushWithUpstream, SelectAndInitRepository } from '@bindings/gitmorrow/app'
-import { CreateUpstreamDialog } from './CreateUpstreamDialog'
+import { SelectRepository, OpenRepository, Fetch, PullForUI, ResolvePull, PushToRemotes, GetPushInfo, SelectAndInitRepository } from '@bindings/gitmorrow/app'
+import { PushDialog } from './PushDialog'
 import { parseGitError } from '@/lib/format'
 import { useQueryClient } from '@tanstack/react-query'
 import { ManageRemotesDialog } from '@/components/RemoteManager/ManageRemotesDialog'
@@ -40,7 +40,7 @@ export default function Toolbar() {
   const [fetchLoading, setFetchLoading] = useState(false)
   const [pullLoading, setPullLoading] = useState(false)
   const [pushLoading, setPushLoading] = useState(false)
-  const [upstreamInfo, setUpstreamInfo] = useState<PushInfo | null>(null)
+  const [pushInfo, setPushInfo] = useState<PushInfo | null>(null)
   const [createDialog, setCreateDialog] = useState<{ kind: 'branch' | 'stash' | 'tag'; repo: string; worktree: string | null } | null>(null)
 
   const openCreateDialog = (kind: 'branch' | 'stash' | 'tag') => {
@@ -61,7 +61,7 @@ export default function Toolbar() {
     return () => window.removeEventListener('git:create', onCreate)
   }, [activeRepo, activeWorktree])
 
-  useEffect(() => { setUpstreamInfo(null) }, [activeRepo])
+  useEffect(() => { setPushInfo(null) }, [activeRepo])
 
   const [pullChoice, setPullChoice] = useState<PullSnapshot | null>(null)
   const pullGeneration = useRef(0)
@@ -185,35 +185,30 @@ export default function Toolbar() {
     }
   }
 
+  // Pushing always asks for the remotes and whether tags should be published:
+  // repositories may reject tag creation, so tags must never ride along unasked.
   const handlePush = async () => {
+    if (!activeRepo) return
     setPushLoading(true)
-    setLoadingOperation('Pushing…')
     try {
       const info = await GetPushInfo()
       if (useGitStore.getState().activeRepo !== activeRepo) return
-      if (!info.upstream) {
-        setUpstreamInfo(info)
-        return
-      }
-      await Push('', '', false)
-      showFlash('Pushed successfully')
-      queryClient.invalidateQueries()
+      setPushInfo(info)
     } catch (err) {
       showFlash(parseGitError(err), 'danger')
     } finally {
       setPushLoading(false)
-      setLoadingOperation(null)
     }
   }
 
-  const handleCreateUpstream = async (remote: string) => {
-    const info = upstreamInfo
-    setUpstreamInfo(null)
+  const handleConfirmedPush = async (remotes: string[], pushTags: boolean) => {
+    const info = pushInfo
+    setPushInfo(null)
     if (!info || useGitStore.getState().activeRepo !== activeRepo) return
     setPushLoading(true)
     setLoadingOperation('Pushing…')
     try {
-      await PushWithUpstream(info.repoPath, remote, info.branch)
+      await PushToRemotes(remotes, pushTags)
       showFlash('Pushed successfully')
       queryClient.invalidateQueries()
     } catch (err) {
@@ -406,7 +401,7 @@ export default function Toolbar() {
       {currentDialog?.kind === 'branch' && <NewBranchDialog onClose={() => setCreateDialog(null)} />}
       {currentDialog?.kind === 'stash' && <CreateStashDialog onClose={() => setCreateDialog(null)} />}
       {currentDialog?.kind === 'tag' && <CreateTagDialog onClose={() => setCreateDialog(null)} />}
-      {upstreamInfo && <CreateUpstreamDialog info={upstreamInfo} onConfirm={handleCreateUpstream} onClose={() => setUpstreamInfo(null)} />}
+      {pushInfo && <PushDialog info={pushInfo} onConfirm={handleConfirmedPush} onClose={() => setPushInfo(null)} />}
       {remoteDialogOpen && <ManageRemotesDialog onClose={() => setRemoteDialogOpen(false)} />}
       {pullChoice && pullChoice.repo === activeRepo && pullChoice.branch === branch && <PullStrategyDialog branch={pullChoice.branch} onClose={() => setPullChoice(null)} onChoose={strategy => handlePull(strategy)} />}
       <KeyboardShortcutsDialog />

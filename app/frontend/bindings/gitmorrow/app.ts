@@ -359,15 +359,14 @@ export function PullIntoLocalBranch(remote: string, localBranch: string): $Cance
     return $Call.ByID(3246898731, remote, localBranch);
 }
 
-export function Push(remote: string, branch: string, force: boolean): $CancellablePromise<void> {
-    return $Call.ByID(260412725, remote, branch, force);
-}
-
 /**
- * PushWithUpstream publishes only the repository and branch the user confirmed.
+ * PushToRemotes publishes the current branch to the remotes and with the tag
+ * choice the user confirmed in the push dialog. It revalidates the branch,
+ * remote names and upstream on the backend so a checkout or repository switch
+ * while the dialog is open cannot publish something else.
  */
-export function PushWithUpstream(repoPath: string, remote: string, branch: string): $CancellablePromise<void> {
-    return $Call.ByID(977489124, repoPath, remote, branch);
+export function PushToRemotes(remotes: string[], pushTags: boolean): $CancellablePromise<void> {
+    return $Call.ByID(4211812403, remotes, pushTags);
 }
 
 export function RemoveRemote(name: string): $CancellablePromise<void> {
