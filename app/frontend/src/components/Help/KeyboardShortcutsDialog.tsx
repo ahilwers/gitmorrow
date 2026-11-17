@@ -32,6 +32,16 @@ const SECTIONS: Section[] = [
     rows: [
       { keys: ['?'], label: 'Open keyboard shortcuts' },
       { keys: ['⌘K'], label: 'Open command palette' },
+      { keys: ['⌘1'], label: 'History view' },
+      { keys: ['⌘2'], label: 'Changes view' },
+    ],
+  },
+  {
+    title: 'Repository',
+    rows: [
+      { keys: ['⌘F'], label: 'Fetch' },
+      { keys: ['⌘L'], label: 'Pull' },
+      { keys: ['⌘P'], label: 'Push' },
     ],
   },
   {

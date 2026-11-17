@@ -12,6 +12,12 @@
 import { useEffect } from 'react'
 import { useGitStore } from '@/stores/gitStore'
 
+// Monaco owns ⌘F (find) and similar chords inside the diff editor; leaving them
+// alone keeps the editor's own key handling intact.
+function insideMonaco(e: KeyboardEvent) {
+  return (e.target as HTMLElement | null)?.closest?.('.monaco-editor') != null
+}
+
 export function useKeyboard() {
   const setActiveView = useGitStore((s) => s.setActiveView)
 
@@ -33,6 +39,20 @@ export function useKeyboard() {
       if (mod && e.key === '2') {
         e.preventDefault()
         setActiveView('changes')
+      }
+      if (!mod || insideMonaco(e)) return
+      // Remote operations are handled by the toolbar, which owns their state.
+      if (e.key === 'f') {
+        e.preventDefault()
+        window.dispatchEvent(new CustomEvent('git:fetch'))
+      }
+      if (e.key === 'l') {
+        e.preventDefault()
+        window.dispatchEvent(new CustomEvent('git:pull'))
+      }
+      if (e.key === 'p') {
+        e.preventDefault()
+        window.dispatchEvent(new CustomEvent('git:push'))
       }
     }
 

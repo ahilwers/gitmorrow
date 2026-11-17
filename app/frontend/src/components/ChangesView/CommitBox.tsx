@@ -25,9 +25,10 @@ const HISTORY_COMMIT_LIMIT = 50
 
 export function CommitBox() {
   const queryClient = useQueryClient()
-  const { showFlash, pendingCherryPickMessage, setPendingCherryPickMessage, setCherryPickConflictActive, activeRepo, activeWorktree } = useGitStore()
+  const { showFlash, pendingCherryPickMessage, setPendingCherryPickMessage, setCherryPickConflictActive, activeRepo, activeWorktree, commitFocusRequest } = useGitStore()
   const [message, setMessage] = useState('')
   const [amend, setAmend] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { data: status } = useStatus()
   const { data: commits } = useCommits(HISTORY_COMMIT_LIMIT, false)
   const mergeMessage = status?.mergeState?.mergeMessage
@@ -74,6 +75,15 @@ export function CommitBox() {
     }
     prevPendingMessage.current = pendingCherryPickMessage
   }, [pendingCherryPickMessage])
+
+  // The Commit command (⌘K palette) switches to the Changes view and asks for
+  // focus here; the box may only mount after the view switch, so the request is
+  // tracked in the store and cleared once handled.
+  useEffect(() => {
+    if (commitFocusRequest === 0) return
+    textareaRef.current?.focus()
+    useGitStore.getState().clearCommitFocusRequest()
+  }, [commitFocusRequest])
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['status'] })
@@ -164,6 +174,7 @@ export function CommitBox() {
       <AICommitAssistant key={`${activeRepo}:${activeWorktree}`} hasStaged={!!status?.files?.some(file => !!file.staged && file.staged !== ' ')} onApply={msg => { setMessage(msg); resetHistory() }} />
       <textarea
         data-commit-input
+        ref={textareaRef}
         value={message}
         onChange={e => { setMessage(e.target.value); resetHistory() }}
         onKeyDown={handleKeyDown}
