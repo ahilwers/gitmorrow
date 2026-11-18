@@ -104,8 +104,9 @@ arguments of its own in this mode, so a small wrapper script is the easiest way 
 exec /path/to/your-cli --model some-model --print
 ```
 
-If the CLI is missing, fails, or does not answer within 45 seconds, GitMorrow shows the CLI's own
-error message or exit code instead of a generic one. A CLI that exits without a message is reported
+If the CLI is missing, fails, or does not answer within 45 seconds, GitMorrow shows what the CLI
+wrote to either output stream — some CLIs print runtime failures on standard output — or its exit
+code, instead of a generic message. A CLI that exits without a message is reported
 with the end of its output, which is where a configuration problem usually shows up — for example a
 model that is not enabled for the account the CLI is signed in to. If generation fails, run the same
 CLI once in a terminal: it reports the same problem there.

@@ -518,17 +518,21 @@ func runCLICommitMessage(ctx context.Context, s AISettings, diff string) (string
 		if ctx.Err() != nil {
 			return "", errors.New("AI CLI did not finish in time; check the configured command")
 		}
-		var exitErr *exec.ExitError
-		if errors.As(runErr, &exitErr) {
-			// The CLI's own message is what the user can act on; do not replace
-			// it with a generic text.
-			if tail == "" {
-				tail = "no error output"
-			}
-			return "", fmt.Errorf("AI CLI failed with exit code %d: %s", exitErr.ExitCode(), tail)
+		// Claude Code writes failures of the run itself to stdout, not stderr,
+		// so fall back to whatever the CLI said on either stream. Replacing that
+		// with a generic text would hide the only actionable part.
+		if tail == "" {
+			tail = strings.TrimSpace(stdout.String())
 		}
 		if tail == "" {
-			return "", fmt.Errorf("Cannot run the AI CLI: %v", runErr)
+			tail = strings.TrimSpace(transcript.String())
+		}
+		if tail == "" {
+			tail = "no error output"
+		}
+		var exitErr *exec.ExitError
+		if errors.As(runErr, &exitErr) {
+			return "", fmt.Errorf("AI CLI failed with exit code %d: %s", exitErr.ExitCode(), tail)
 		}
 		return "", fmt.Errorf("Cannot run the AI CLI: %s", tail)
 	}

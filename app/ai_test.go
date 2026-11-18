@@ -450,3 +450,24 @@ func TestCodexPresetTakesMessageFromFile(t *testing.T) {
 		}
 	}
 }
+
+func TestCLICommitMessageFailureOnStdout(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell script fixture")
+	}
+	// Claude Code prints failures of the run itself as the result on stdout
+	// and exits non-zero; that text is the only diagnosis the user gets.
+	body := "printf 'Error: Invalid API key \302\267 Please run /login\\n'\nexit 1\n"
+	script := cliScript(t, t.TempDir(), "fake-cli", body)
+	settings := AISettings{AuthMode: authModeCLI, CLI: cliCustomPreset, CLIPath: script}
+
+	_, err := runCLICommitMessage(context.Background(), settings, "diff")
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	for _, want := range []string{"exit code 1", "Invalid API key", "Please run /login"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error %q does not contain %q", err, want)
+		}
+	}
+}
