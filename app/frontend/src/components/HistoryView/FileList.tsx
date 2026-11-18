@@ -9,6 +9,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import type { Ref } from 'react'
 import { FileIcon } from 'lucide-react'
 import type { DiffFile } from '@/lib/types'
 
@@ -16,9 +17,11 @@ interface FileListProps {
   files: DiffFile[]
   selectedFile: string | null
   onSelect: (path: string) => void
+  /** Receives the scrolling row container, so a parent can drive it from keys. */
+  scrollRef?: Ref<HTMLDivElement>
 }
 
-export function FileList({ files, selectedFile, onSelect }: FileListProps) {
+export function FileList({ files, selectedFile, onSelect, scrollRef }: FileListProps) {
   const totalAdded = files.reduce((sum, f) =>
     sum + (f.hunks?.flatMap(h => h.lines).filter(l => l.type === 'add').length ?? 0), 0)
   const totalDeleted = files.reduce((sum, f) =>
@@ -38,7 +41,7 @@ export function FileList({ files, selectedFile, onSelect }: FileListProps) {
       </div>
 
       {/* File rows */}
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto' }}>
         {files.map(file => (
           <FileRow
             key={file.path}
@@ -71,6 +74,7 @@ function FileRow({ file, selected, onSelect }: FileRowProps) {
   return (
     <div
       onClick={onSelect}
+      data-file-path={file.path}
       style={{
         display: 'flex', alignItems: 'center', gap: 8,
         padding: '6px 12px', cursor: 'pointer',

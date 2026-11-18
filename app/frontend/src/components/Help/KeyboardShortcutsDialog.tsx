@@ -94,9 +94,11 @@ const SECTIONS: Section[] = [
   {
     title: 'History — Commit Detail',
     rows: [
-      { keys: ['↑', '↓', 'j', 'k'], label: 'Scroll' },
+      { keys: ['↑', '↓', 'j', 'k'], label: 'Navigate files' },
+      { keys: ['Home', 'End'], label: 'First / last file' },
       { keys: ['Ctrl+D'], label: 'Scroll half page down' },
       { keys: ['Ctrl+U'], label: 'Scroll half page up' },
+      { keys: ['PgDn', 'PgUp'], label: 'Scroll full page' },
       { keys: ['Tab', 'Ctrl+H', 'Esc'], label: 'Move focus back to commit list' },
     ],
   },
