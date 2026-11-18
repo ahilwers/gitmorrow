@@ -100,15 +100,16 @@
     "hasUncommittedChanges": "Has uncommitted changes"
   },
   "push": {
-    "createUpstream": {
-      "title": "Create Upstream Branch?",
-      "description": "Branch {{branch}} has no upstream. Push it to a remote branch with the same name and track it for future pushes and pulls?",
+    "dialog": {
+      "title": "Push branch",
+      "description": "Publish {{branch}} to the selected remotes.",
+      "remotes": "Remotes",
       "noRemotes": "No remotes configured. Add one using Manage Remotes before pushing.",
-      "remote": "Remote",
-      "selectRemote": "Select a remote…",
-      "preview": "Upstream: {{upstream}}",
+      "createUpstream": "{{remote}} becomes the upstream for {{branch}}.",
+      "pushTags": "Also push tags",
+      "pushTagsHint": "Turn this off when the remote rejects tag creation.",
       "cancel": "Cancel",
-      "confirm": "Create Upstream & Push"
+      "confirm": "Push"
     }
   },
   "errors": {

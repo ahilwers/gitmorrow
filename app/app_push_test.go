@@ -19,7 +19,7 @@ import (
 	gitpkg "gitmorrow/git"
 )
 
-func TestPushRequiresConfirmationAndPreservesNormalPush(t *testing.T) {
+func TestPushToRemotesConfirmsSelectionAndPreservesNormalPush(t *testing.T) {
 	dir := t.TempDir()
 	remote := t.TempDir()
 	run := func(path string, args ...string) string {
@@ -48,24 +48,48 @@ func TestPushRequiresConfirmationAndPreservesNormalPush(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := app.Push("", "", false); err == nil || !strings.Contains(err.Error(), "confirm creation") {
-		t.Fatalf("unconfirmed push error = %v", err)
+	if err := app.PushToRemotes(nil, true); err == nil || !strings.Contains(err.Error(), "at least one remote") {
+		t.Fatalf("empty selection error = %v", err)
 	}
 	if got := run(remote, "for-each-ref"); got != "" {
 		t.Fatalf("unconfirmed push wrote remote: %s", got)
 	}
-	if err := app.PushWithUpstream(info.RepoPath, "publish", info.Branch); err != nil {
+	if err := app.PushToRemotes([]string{"publish"}, false); err != nil {
 		t.Fatal(err)
 	}
+	if got := run(remote, "rev-parse", "refs/heads/"+info.Branch); got != run(dir, "rev-parse", "HEAD") {
+		t.Fatal("push did not publish the branch")
+	}
 	run(dir, "commit", "--allow-empty", "-m", "next")
-	if err := app.Push("", "", false); err != nil {
+	if err := app.PushToRemotes([]string{"publish"}, false); err != nil {
 		t.Fatalf("normal tracked push: %v", err)
 	}
 	if got := run(remote, "rev-parse", "refs/heads/"+info.Branch); got != run(dir, "rev-parse", "HEAD") {
 		t.Fatal("tracked push did not advance upstream")
 	}
 	run(dir, "checkout", "--detach")
-	if err := app.Push("", "", false); err == nil || !strings.Contains(err.Error(), "detached HEAD") {
+	if err := app.PushToRemotes([]string{"publish"}, false); err == nil || !strings.Contains(err.Error(), "detached HEAD") {
 		t.Fatalf("detached push error = %v", err)
+	}
+}
+
+// TestPushPreferencesRoundTrip exercises the bound wrappers, so a broken wiring
+// between the app and the preference store fails the app tests.
+func TestPushPreferencesRoundTrip(t *testing.T) {
+	configDir := t.TempDir()
+	t.Setenv("HOME", configDir)            // macOS: ~/Library/Application Support
+	t.Setenv("XDG_CONFIG_HOME", configDir) // Linux
+	t.Setenv("APPDATA", configDir)         // Windows
+
+	app := &App{}
+	if prefs := app.GetPushPreferences("/repo"); prefs.Saved || len(prefs.Remotes) != 0 {
+		t.Fatalf("unknown repository returned %+v", prefs)
+	}
+	if err := app.SavePushPreferences("/repo", []string{"origin", "fork"}, false); err != nil {
+		t.Fatal(err)
+	}
+	prefs := app.GetPushPreferences("/repo")
+	if !prefs.Saved || prefs.PushTags || len(prefs.Remotes) != 2 || prefs.Remotes[1] != "fork" {
+		t.Fatalf("remembered choice = %+v", prefs)
 	}
 }

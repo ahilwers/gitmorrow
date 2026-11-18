@@ -39,9 +39,9 @@ func TestWriteOperationsWithoutRepository(t *testing.T) {
 		"amend":               func() error { return app.AmendCommit("message") },
 		"fetch":               func() error { return app.Fetch("origin") },
 		"pull":                func() error { return app.Pull("origin", "main") },
-		"push":                func() error { return app.Push("origin", "main", false) },
+		"push":                func() error { return app.PushToRemotes([]string{"origin"}, false) },
 		"push preflight":      func() error { _, err := app.GetPushInfo(); return err },
-		"create upstream":     func() error { return app.PushWithUpstream("/repo", "origin", "main") },
+		"create upstream":     func() error { return app.PushToRemotes([]string{"origin"}, true) },
 		"create branch":       func() error { return app.CreateBranch("branch", "main", false) },
 		"merge":               func() error { return app.MergeBranch("branch") },
 		"cherry-pick":         func() error { return app.CherryPickCommits(nil) },
@@ -160,17 +160,16 @@ func TestPushPublishesTags(t *testing.T) {
 	}
 	runGit("remote", "add", "origin", remote)
 	canonical := runGit("branch", "--show-current")
-	info, err := app.GetPushInfo()
-	if err != nil {
-		t.Fatalf("push info: %v", err)
-	}
-	if err := app.PushWithUpstream(info.RepoPath, "origin", info.Branch); err != nil {
+	if err := app.PushToRemotes([]string{"origin"}, true); err != nil {
 		t.Fatalf("create upstream: %v", err)
+	}
+	if info, err := app.GetPushInfo(); err != nil || info.Upstream != "origin/"+canonical {
+		t.Fatalf("upstream after first push: %+v, %v", info, err)
 	}
 	// Default push of an already-tracked branch must carry tags too.
 	runGit("tag", "v2.0")
 	runGit("tag", "-a", "v2.1", "-m", "release")
-	if err := app.Push("", "", false); err != nil {
+	if err := app.PushToRemotes([]string{"origin"}, true); err != nil {
 		t.Fatalf("default push: %v", err)
 	}
 	refs := remoteGit("for-each-ref", "--format=%(refname)")

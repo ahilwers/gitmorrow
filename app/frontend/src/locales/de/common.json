@@ -95,15 +95,16 @@
     "hasUncommittedChanges": "Enthält uncommittete Änderungen"
   },
   "push": {
-    "createUpstream": {
-      "title": "Upstream-Branch erstellen?",
-      "description": "Branch {{branch}} hat keinen Upstream. Soll er in einen gleichnamigen Remote-Branch gepusht und dieser für zukünftige Pushes und Pulls als Upstream verwendet werden?",
+    "dialog": {
+      "title": "Branch pushen",
+      "description": "{{branch}} in die ausgewählten Remotes veröffentlichen.",
+      "remotes": "Remotes",
       "noRemotes": "Keine Remotes konfiguriert. Füge vor dem Pushen über „Remotes verwalten“ einen Remote hinzu.",
-      "remote": "Remote-Repository",
-      "selectRemote": "Remote auswählen…",
-      "preview": "Upstream-Branch: {{upstream}}",
+      "createUpstream": "{{remote}} wird der Upstream für {{branch}}.",
+      "pushTags": "Tags ebenfalls pushen",
+      "pushTagsHint": "Ausschalten, wenn der Remote das Anlegen von Tags ablehnt.",
       "cancel": "Abbrechen",
-      "confirm": "Upstream erstellen & pushen"
+      "confirm": "Pushen"
     }
   },
   "errors": {
