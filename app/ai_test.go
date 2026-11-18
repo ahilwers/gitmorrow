@@ -333,3 +333,120 @@ func TestCLICommitMessageTimeout(t *testing.T) {
 		t.Fatalf("timeout was not enforced, took %s", elapsed)
 	}
 }
+
+// testOutputPreset registers a preset whose message is written to the file
+// named by cliOutputArg, the way Codex CLI is invoked.
+func testOutputPreset(t *testing.T, binary string) string {
+	t.Helper()
+	const name = "test-output-file"
+	previous, existed := cliPresets[name]
+	cliPresets[name] = cliPreset{Binary: binary, Args: []string{"--output-last-message", cliOutputArg}}
+	t.Cleanup(func() {
+		if existed {
+			cliPresets[name] = previous
+			return
+		}
+		delete(cliPresets, name)
+	})
+	return name
+}
+
+func TestCLICommitMessageUsesOutputFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell script fixture")
+	}
+	// Codex CLI echoes the prompt and its log to stdout and writes only the
+	// message to the output file; the transcript must not become the message.
+	body := "out=\"$2\"\n" +
+		"i=0\nwhile [ $i -lt 40000 ]; do printf 'x'; i=$((i+1)); done\n" +
+		"printf 'feat: from the output file\\n\\nBody from the file.\\n' > \"$out\"\n"
+	script := cliScript(t, t.TempDir(), "fake-cli", body)
+	settings := AISettings{AuthMode: authModeCLI, CLI: testOutputPreset(t, script)}
+
+	got, err := runCLICommitMessage(context.Background(), settings, "diff")
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if got != "feat: from the output file\n\nBody from the file." {
+		t.Fatalf("unexpected message: %q", got)
+	}
+}
+
+func TestCLICommitMessageOutputFileMissing(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell script fixture")
+	}
+	// A CLI that exits 0 without a message leaves the reason on the transcript.
+	body := "printf 'starting\\n'\nprintf \"ERROR: the 'x' model is not supported\\n\"\n"
+	script := cliScript(t, t.TempDir(), "fake-cli", body)
+	settings := AISettings{AuthMode: authModeCLI, CLI: testOutputPreset(t, script)}
+
+	_, err := runCLICommitMessage(context.Background(), settings, "diff")
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	for _, want := range []string{"empty message", "model is not supported"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error %q does not contain %q", err, want)
+		}
+	}
+}
+
+func TestCLICommitMessageOutputFileOversized(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell script fixture")
+	}
+	body := "out=\"$2\"\ni=0\nwhile [ $i -lt 40000 ]; do printf 'x'; i=$((i+1)); done > \"$out\"\n"
+	script := cliScript(t, t.TempDir(), "fake-cli", body)
+	settings := AISettings{AuthMode: authModeCLI, CLI: testOutputPreset(t, script)}
+
+	if _, err := runCLICommitMessage(context.Background(), settings, "diff"); err == nil || !strings.Contains(err.Error(), "too much output") {
+		t.Fatalf("oversized output not reported: %v", err)
+	}
+}
+
+func TestPrepareCLIOutput(t *testing.T) {
+	args := []string{"exec", "--output-last-message", cliOutputArg}
+	got, file, cleanup, err := prepareCLIOutput(args)
+	if err != nil {
+		t.Fatalf("prepare: %v", err)
+	}
+	if file == "" || got[2] == cliOutputArg || got[2] != file {
+		t.Fatalf("placeholder not replaced: %v (file %q)", got, file)
+	}
+	// The preset's own slice must survive: it is shared by every call.
+	if args[2] != cliOutputArg {
+		t.Fatalf("preset arguments were modified: %v", args)
+	}
+	if _, err := os.Stat(file); err != nil {
+		t.Fatalf("output file was not created: %v", err)
+	}
+	cleanup()
+	if _, err := os.Stat(file); !os.IsNotExist(err) {
+		t.Fatalf("output file was not removed: %v", err)
+	}
+
+	plain, file, cleanup, err := prepareCLIOutput([]string{"-p"})
+	defer cleanup()
+	if err != nil || file != "" || len(plain) != 1 {
+		t.Fatalf("preset without an output file changed: %v, %q, %v", plain, file, err)
+	}
+}
+
+func TestCodexPresetTakesMessageFromFile(t *testing.T) {
+	// Codex CLI exits 0 after a stream error and prints its transcript to
+	// stdout, so the preset must read --output-last-message.
+	preset, ok := cliPresets["codex"]
+	if !ok {
+		t.Fatal("codex preset missing")
+	}
+	if preset.Binary != "codex" {
+		t.Fatalf("unexpected binary: %q", preset.Binary)
+	}
+	joined := strings.Join(preset.Args, " ")
+	for _, want := range []string{"exec", "--skip-git-repo-check", "--output-last-message", cliOutputArg} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("codex preset %q does not contain %q", joined, want)
+		}
+	}
+}
