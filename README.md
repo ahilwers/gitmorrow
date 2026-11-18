@@ -77,7 +77,7 @@ not run the command through a shell. The presets map to these non-interactive en
 | Preset | Command GitMorrow runs |
 |---|---|
 | Claude Code | `claude -p` |
-| Codex CLI | `codex exec` |
+| Codex CLI | `codex exec --skip-git-repo-check --output-last-message <temporary file>` |
 | Copilot CLI | `copilot -p` |
 
 Setup:
@@ -88,6 +88,11 @@ Setup:
    executable when the command is not on `PATH` — typical on macOS, where an app started from Finder
    does not inherit your shell's `PATH`.
 4. Save the settings, stage some changes, and press **Generate with AI**.
+
+Codex CLI streams its whole transcript, including an echo of the prompt, to standard output and
+writes only the final message to a file, so GitMorrow reads that file and ignores the transcript. It
+also passes `--skip-git-repo-check`, because the working directory of a GUI application is not always
+a Git repository.
 
 For a CLI that is not in the list, choose **Custom command** and enter the path of an executable that
 reads the prompt from standard input and prints the message to standard output. GitMorrow passes no
@@ -100,7 +105,10 @@ exec /path/to/your-cli --model some-model --print
 ```
 
 If the CLI is missing, fails, or does not answer within 45 seconds, GitMorrow shows the CLI's own
-error message or exit code instead of a generic one.
+error message or exit code instead of a generic one. A CLI that exits without a message is reported
+with the end of its output, which is where a configuration problem usually shows up — for example a
+model that is not enabled for the account the CLI is signed in to. If generation fails, run the same
+CLI once in a terminal: it reports the same problem there.
 
 ### API key
 
