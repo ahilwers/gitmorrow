@@ -240,6 +240,31 @@ export default function Toolbar() {
     }
   }
 
+  // Commands from the global shortcuts (⌘F/⌘L/⌘P) and the command palette land
+  // here: the toolbar owns the remote-operation state and its handlers.
+  const remoteActions = useRef({ fetch: handleFetch, pull: handlePull, push: handlePush })
+  remoteActions.current = { fetch: handleFetch, pull: handlePull, push: handlePush }
+  const remoteBusy = useRef(false)
+  remoteBusy.current = fetchLoading || pullLoading || pushLoading
+  useEffect(() => {
+    const bind = (event: string, pick: (actions: typeof remoteActions.current) => () => void) => {
+      const handler = () => {
+        if (remoteBusy.current || !useGitStore.getState().activeRepo) return
+        pick(remoteActions.current)()
+      }
+      window.addEventListener(event, handler)
+      return () => window.removeEventListener(event, handler)
+    }
+    const offFetch = bind('git:fetch', actions => actions.fetch)
+    const offPull = bind('git:pull', actions => actions.pull)
+    const offPush = bind('git:push', actions => actions.push)
+    return () => {
+      offFetch()
+      offPull()
+      offPush()
+    }
+  }, [])
+
   return (
     <div
       className="app-toolbar"

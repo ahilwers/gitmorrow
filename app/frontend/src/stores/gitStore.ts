@@ -85,6 +85,11 @@ interface GitStore {
   loadingOperation: string | null
   setLoadingOperation: (op: string | null) => void
 
+  // Bumped when the Commit command runs, so the commit box focuses itself once mounted
+  commitFocusRequest: number
+  requestCommitFocus: () => void
+  clearCommitFocusRequest: () => void
+
   // Flash notifications
   flash: { message: string; type: 'success' | 'danger' | 'info' } | null
   showFlash: (message: string, type?: 'success' | 'danger' | 'info', durationMs?: number) => void
@@ -136,6 +141,7 @@ const initialState = {
   helpDialogOpen: false,
   aboutDialogOpen: false,
   loadingOperation: null as string | null,
+  commitFocusRequest: 0,
 }
 
 export const useGitStore = create<GitStore>()(
@@ -191,6 +197,8 @@ export const useGitStore = create<GitStore>()(
       setHelpDialogOpen: (helpDialogOpen) => set({ helpDialogOpen }),
       setAboutDialogOpen: (aboutDialogOpen) => set({ aboutDialogOpen }),
       setLoadingOperation: (loadingOperation) => set({ loadingOperation }),
+      requestCommitFocus: () => set((s) => ({ commitFocusRequest: s.commitFocusRequest + 1 })),
+      clearCommitFocusRequest: () => set({ commitFocusRequest: 0 }),
 
       showFlash: (message, type = 'success', durationMs) => {
         set({ flash: { message, type } })

@@ -10,7 +10,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useGitStore } from '@/stores/gitStore'
 import type { CommitNode, RepoStatus } from '@/lib/types'
@@ -138,5 +138,35 @@ describe('commit box message history', () => {
     setCaret(input, 0)
     fireEvent.keyDown(input, { key: 'ArrowUp', shiftKey: true })
     expect(input.value).toBe('draft')
+  })
+})
+
+describe('commit box focus request', () => {
+  beforeEach(() => {
+    useGitStore.setState({ activeRepo: '/tmp/test-repo', activeWorktree: null, commitFocusRequest: 0 })
+  })
+
+  afterEach(() => {
+    cleanup()
+    useGitStore.setState({ activeRepo: null, activeWorktree: null, commitFocusRequest: 0 })
+  })
+
+  it('focuses the message field when the commit command asks for it', () => {
+    const input = renderBox()
+    expect(document.activeElement).not.toBe(input)
+
+    act(() => useGitStore.getState().requestCommitFocus())
+
+    expect(document.activeElement).toBe(input)
+  })
+
+  it('does not steal focus again on a later mount', () => {
+    const input = renderBox()
+    act(() => useGitStore.getState().requestCommitFocus())
+    expect(document.activeElement).toBe(input)
+
+    cleanup()
+    const remounted = renderBox()
+    expect(document.activeElement).not.toBe(remounted)
   })
 })

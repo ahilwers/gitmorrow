@@ -31,15 +31,18 @@ export default function CommandPalette() {
   const commands: Command[] = useMemo(() => [
     { label: 'History view',  shortcut: '⌘1', action: () => setActiveView('history') },
     { label: 'Changes view',  shortcut: '⌘2', action: () => setActiveView('changes') },
-    { label: 'Fetch',         shortcut: '⌘F', action: () => {} },
-    { label: 'Pull',          shortcut: '⌘L', action: () => {} },
-    { label: 'Push',          shortcut: '⌘P', action: () => {} },
+    { label: 'Fetch',         shortcut: '⌘F', action: () => window.dispatchEvent(new CustomEvent('git:fetch')) },
+    { label: 'Pull',          shortcut: '⌘L', action: () => window.dispatchEvent(new CustomEvent('git:pull')) },
+    { label: 'Push',          shortcut: '⌘P', action: () => window.dispatchEvent(new CustomEvent('git:push')) },
     ...(activeRepo ? [
       { label: 'New Branch', action: () => window.dispatchEvent(new CustomEvent('git:create', { detail: 'branch' })) },
       { label: 'Stash', action: () => window.dispatchEvent(new CustomEvent('git:create', { detail: 'stash' })) },
       { label: 'New Tag', action: () => window.dispatchEvent(new CustomEvent('git:create', { detail: 'tag' })) },
     ] : []),
-    { label: 'Commit',        shortcut: '⌘↵', action: () => {} },
+    { label: 'Commit',        shortcut: '⌘↵', action: () => {
+      setActiveView('changes')
+      useGitStore.getState().requestCommitFocus()
+    } },
   ], [setActiveView, activeRepo])
 
   const filtered = useMemo(() =>
