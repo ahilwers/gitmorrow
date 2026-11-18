@@ -57,3 +57,52 @@ it('uses visible action buttons and highlights the save action', async () => {
   expect(screen.getByRole('button', { name: 'AI settings' })).toHaveClass('action-button')
   expect(screen.getByRole('button', { name: 'Generate with AI' })).toHaveClass('action-button')
 })
+
+// A CLI configured without any stored key: the CLI authenticates itself.
+const cliSettings = {
+  authMode: 'cli',
+  provider: 'openrouter',
+  baseURL: 'https://openrouter.ai/api/v1',
+  model: 'openai/gpt-4o-mini',
+  cli: 'claude',
+  cliPath: '',
+  hasAPIKey: false,
+}
+
+it('generates without an API key when a CLI is configured', async () => {
+  vi.mocked(GetAISettings).mockResolvedValue(cliSettings)
+  vi.mocked(GenerateCommitMessage).mockResolvedValue('feat: cli subject\n\nBody from the CLI.')
+  const apply = vi.fn()
+  render(<AICommitAssistant hasStaged onApply={apply} />)
+  await waitFor(() => expect(screen.getByText('Generate with AI')).not.toBeDisabled())
+  fireEvent.click(screen.getByText('Generate with AI'))
+  await screen.findByText('Suggested message — review before applying')
+  expect(GenerateCommitMessage).toHaveBeenCalled()
+  expect(apply).not.toHaveBeenCalled()
+})
+
+it('shows the CLI selection instead of the key fields in CLI mode', async () => {
+  vi.mocked(GetAISettings).mockResolvedValue(cliSettings)
+  render(<AICommitAssistant hasStaged onApply={vi.fn()} />)
+  fireEvent.click(screen.getByText('AI settings'))
+  expect(await screen.findByLabelText('Authentication')).toHaveValue('cli')
+  expect(screen.getByLabelText('CLI')).toHaveValue('claude')
+  expect(screen.queryByLabelText(/API key/)).toBeNull()
+  expect(screen.queryByLabelText('Provider')).toBeNull()
+  expect(screen.getByText(/written to the standard input/)).toBeInTheDocument()
+})
+
+it('keeps the API key fields when the key mode is selected', async () => {
+  render(<AICommitAssistant hasStaged onApply={vi.fn()} />)
+  fireEvent.click(screen.getByText('AI settings'))
+  expect(await screen.findByLabelText('Authentication')).toHaveValue('apiKey')
+  expect(screen.getByLabelText(/API key/)).toHaveValue('')
+  expect(screen.getByLabelText('Provider')).toHaveValue('openrouter')
+  expect(screen.queryByLabelText('CLI')).toBeNull()
+})
+
+it('disables Generate without a key in API key mode', async () => {
+  vi.mocked(GetAISettings).mockResolvedValue({ ...cliSettings, authMode: 'apiKey' })
+  render(<AICommitAssistant hasStaged onApply={vi.fn()} />)
+  await waitFor(() => expect(screen.getByText('Generate with AI')).toBeDisabled())
+})

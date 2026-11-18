@@ -127,5 +127,42 @@
   "loading": "Pull läuft…",
   "success": "Pull erfolgreich",
   "conflict": "Pull angehalten. Löse Konflikte unter Änderungen und fahre dann fort oder brich den Vorgang ab."
-}
+},
+  "aiCommit": {
+    "section": "KI-Commit-Assistent",
+    "generate": "Mit KI vorschlagen",
+    "working": "Arbeitet…",
+    "settings": "KI-Einstellungen",
+    "privacyApiKey": "Nur bei Generieren: gestagter Diff (bis zu {{size}} KiB, inklusive Code und Pfaden) wird an den konfigurierten Anbieter gesendet. Vorher auf Secrets prüfen. Es gelten die Datenrichtlinien und Kosten des Anbieters; größere Diffs kosten mehr oder überschreiten das Kontextfenster des Modells. Es wird nichts automatisch committet.",
+    "privacyCli": "Nur bei Generieren: gestagter Diff (bis zu {{size}} KiB, inklusive Code und Pfaden) wird an der Standardeingabe der gewählten CLI auf diesem Rechner übergeben. Vorher auf Secrets prüfen. Es gelten die Richtlinien und Limits der CLI. Es wird nichts automatisch committet, und GitMorrow sieht keine Zugangsdaten.",
+    "legend": "KI-Commit-Einstellungen",
+    "authMode": "Anmeldung",
+    "modeApiKey": "API-Schlüssel",
+    "modeCli": "Lokale CLI",
+    "cli": "CLI",
+    "cliPreset": {
+      "claude": "Claude Code",
+      "codex": "Codex CLI",
+      "copilot": "Copilot CLI",
+      "custom": "Eigener Befehl"
+    },
+    "cliPath": "Pfad zur ausführbaren Datei",
+    "cliPathPlaceholder": "Optional: Pfad zur ausführbaren Datei (sonst der Befehl aus PATH)",
+    "cliPathRequired": "Erforderlich: Pfad zur ausführbaren Datei",
+    "cliHint": "Die CLI läuft lokal und muss bereits angemeldet sein. Der Prompt wird über die Standardeingabe übergeben; GitMorrow liest keine Zugangsdaten.",
+    "provider": "Anbieter",
+    "baseURL": "API-Basis-URL",
+    "model": "Modell-ID",
+    "apiKey": "API-Schlüssel",
+    "apiKeyStored": "(sicher gespeichert; leer lassen behält den bestehenden)",
+    "apiKeyRequired": "(erforderlich)",
+    "removeKey": "Gespeicherten Schlüssel für diesen Endpunkt entfernen",
+    "keysHint": "Schlüssel liegen im Schlüsselspeicher des Betriebssystems, nie in Repository-Dateien. Einstellungen vor dem Generieren speichern.",
+    "saved": "Einstellungen gespeichert",
+    "save": "KI-Einstellungen speichern",
+    "errorLoad": "KI-Einstellungen konnten nicht geladen werden",
+    "suggestion": "Vorschlag — vor dem Übernehmen prüfen",
+    "apply": "Eingabe durch Vorschlag ersetzen",
+    "dismiss": "Verwerfen"
+  }
 }

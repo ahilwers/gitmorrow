@@ -90,7 +90,7 @@ export const SwitchWorktree = vi.fn((_path: string): Promise<void> => Promise.re
 export const OpenInFinder = vi.fn((_path: string): Promise<void> => Promise.resolve())
 export const SelectRepository = vi.fn((): Promise<string> => Promise.resolve(''))
 export const SaveWindowSize = vi.fn((_width: number, _height: number): Promise<void> => Promise.resolve())
-export const GetAISettings = vi.fn(() => Promise.resolve({ provider: 'openrouter', baseURL: 'https://openrouter.ai/api/v1', model: 'openai/gpt-4o-mini', hasAPIKey: false }))
+export const GetAISettings = vi.fn(() => Promise.resolve({ authMode: 'apiKey', provider: 'openrouter', baseURL: 'https://openrouter.ai/api/v1', model: 'openai/gpt-4o-mini', cli: 'claude', cliPath: '', hasAPIKey: true }))
 export const SaveAISettings = vi.fn(() => Promise.resolve())
 export const GenerateCommitMessage = vi.fn(() => Promise.resolve('Suggested subject\n\nSuggested body.'))
 export const GetRecentRepos = vi.fn((): Promise<string[]> => Promise.resolve([]))
