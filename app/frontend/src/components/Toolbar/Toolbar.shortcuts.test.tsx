@@ -10,9 +10,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Fetch, GetPushInfo, GetStatus, PullForUI, Push } from '@bindings/gitmorrow/app'
+import {
+  Fetch, GetPushInfo, GetPushPreferences, GetStatus, PullForUI, PushToRemotes, SavePushPreferences,
+} from '@bindings/gitmorrow/app'
 import { useGitStore } from '@/stores/gitStore'
 import { useKeyboard } from '@/hooks/useKeyboard'
 import Toolbar from './Toolbar'
@@ -45,10 +47,19 @@ function paletteCommand(shortcut: string) {
   return kbd as HTMLButtonElement
 }
 
+// Pushing always opens the remote/tag dialog first; confirming it is the step
+// the shortcut and palette commands have to reach.
+async function confirmPushDialog() {
+  const dialog = await screen.findByRole('dialog', { name: 'Push branch' })
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Push' }))
+}
+
 beforeEach(() => {
   vi.mocked(GetStatus).mockReset().mockResolvedValue(status)
   vi.mocked(GetPushInfo).mockReset().mockResolvedValue({ repoPath: '/repo', branch: 'main', upstream: 'origin/main', remotes: ['origin'] })
-  vi.mocked(Push).mockReset().mockResolvedValue(undefined)
+  vi.mocked(GetPushPreferences).mockReset().mockResolvedValue({ remotes: [], pushTags: true, saved: false })
+  vi.mocked(SavePushPreferences).mockReset().mockResolvedValue(undefined)
+  vi.mocked(PushToRemotes).mockReset().mockResolvedValue(undefined)
   vi.mocked(Fetch).mockReset().mockResolvedValue(undefined)
   vi.mocked(PullForUI).mockReset().mockResolvedValue({ outcome: 'success' })
   useGitStore.setState({
@@ -65,7 +76,8 @@ describe('repository keyboard shortcuts', () => {
     pressShortcut('p')
 
     await waitFor(() => expect(GetPushInfo).toHaveBeenCalled())
-    await waitFor(() => expect(Push).toHaveBeenCalledWith('', '', false))
+    await confirmPushDialog()
+    await waitFor(() => expect(PushToRemotes).toHaveBeenCalledWith(['origin'], true))
   })
 
   it('fetches on ⌘F', async () => {
@@ -91,7 +103,7 @@ describe('repository keyboard shortcuts', () => {
 
     await Promise.resolve()
     expect(GetPushInfo).not.toHaveBeenCalled()
-    expect(Push).not.toHaveBeenCalled()
+    expect(PushToRemotes).not.toHaveBeenCalled()
     editor.remove()
   })
 
@@ -111,7 +123,8 @@ describe('command palette remote commands', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Command Palette (⌘K)' }))
     fireEvent.click(await waitFor(() => paletteCommand('⌘P')))
 
-    await waitFor(() => expect(Push).toHaveBeenCalledWith('', '', false))
+    await confirmPushDialog()
+    await waitFor(() => expect(PushToRemotes).toHaveBeenCalledWith(['origin'], true))
   })
 
   it('fetches from the command palette', async () => {
