@@ -5,8 +5,11 @@
  * AISettings contains no secret. Credentials never return to the webview.
  */
 export interface AISettings {
+    "authMode": string;
     "provider": string;
     "baseURL": string;
     "model": string;
+    "cli": string;
+    "cliPath": string;
     "hasAPIKey": boolean;
 }

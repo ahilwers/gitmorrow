@@ -132,5 +132,42 @@
   "loading": "Pulling…",
   "success": "Pulled successfully",
   "conflict": "Pull stopped. Resolve conflicts in Changes, then continue or abort."
-}
+},
+  "aiCommit": {
+    "section": "AI commit assistant",
+    "generate": "Generate with AI",
+    "working": "Working…",
+    "settings": "AI settings",
+    "privacyApiKey": "Only on Generate: staged diff (up to {{size}} KiB, including code and paths) is sent to your configured provider. Review for secrets first. Provider data policies and usage charges apply; larger diffs may cost more or exceed your model's context limit. Nothing is committed automatically.",
+    "privacyCli": "Only on Generate: staged diff (up to {{size}} KiB, including code and paths) is written to the standard input of the selected CLI on this machine. Review for secrets first. The CLI's own provider policies and usage limits apply. Nothing is committed automatically, and GitMorrow never holds a credential.",
+    "legend": "AI commit settings",
+    "authMode": "Authentication",
+    "modeApiKey": "API key",
+    "modeCli": "Local CLI",
+    "cli": "CLI",
+    "cliPreset": {
+      "claude": "Claude Code",
+      "codex": "Codex CLI",
+      "copilot": "Copilot CLI",
+      "custom": "Custom command"
+    },
+    "cliPath": "Executable path",
+    "cliPathPlaceholder": "Optional: path to the executable (defaults to the command on PATH)",
+    "cliPathRequired": "Required: path to the executable",
+    "cliHint": "The CLI runs locally and must already be signed in. The prompt is passed on standard input; GitMorrow never reads its credentials.",
+    "provider": "Provider",
+    "baseURL": "API base URL",
+    "model": "Model ID",
+    "apiKey": "API key",
+    "apiKeyStored": "(stored securely; blank keeps existing)",
+    "apiKeyRequired": "(required)",
+    "removeKey": "Remove stored key for this endpoint",
+    "keysHint": "Keys stay in the OS credential store, never in repository files. Save settings before generating.",
+    "saved": "Settings saved",
+    "save": "Save AI settings",
+    "errorLoad": "Cannot load AI settings",
+    "suggestion": "Suggested message — review before applying",
+    "apply": "Replace input with suggestion",
+    "dismiss": "Dismiss"
+  }
 }
