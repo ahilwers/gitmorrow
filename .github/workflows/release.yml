@@ -114,11 +114,66 @@ jobs:
             libsoup-3.0-dev libayatana-appindicator3-dev librsvg2-dev libglib2.0-dev
 
       # Wails builds the NSIS installer with makensis, which is not preinstalled
-      # on GitHub Windows runners.
+      # on GitHub Windows runners (the current windows-latest image no longer
+      # ships it). The Chocolatey community feed intermittently answers with a
+      # 5xx while `choco install` still exits 0, so retry, verify that makensis
+      # really exists, and fall back to the portable archive if the feed stays
+      # unavailable.
       - name: Install NSIS (Windows)
         if: matrix.family == 'windows'
-        run: choco install nsis -y --no-progress
         shell: pwsh
+        run: |
+          $candidates = @(
+            'C:\Program Files (x86)\NSIS\makensis.exe',
+            'C:\Program Files\NSIS\makensis.exe',
+            'C:\ProgramData\chocolatey\bin\makensis.exe'
+          )
+
+          function Find-Makensis {
+            foreach ($candidate in $candidates) {
+              if (Test-Path $candidate) { return $candidate }
+            }
+            $command = Get-Command makensis -ErrorAction SilentlyContinue
+            if ($command) { return $command.Source }
+            return $null
+          }
+
+          $makensis = $null
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            choco install nsis -y --no-progress
+            $makensis = Find-Makensis
+            if ($makensis) { break }
+            Write-Host "::warning::NSIS attempt $attempt did not provide makensis."
+            if ($attempt -lt 3) { Start-Sleep -Seconds 15 }
+          }
+
+          # The community feed can also be down for longer than the retries
+          # cover. The portable archive from the NSIS project itself needs no
+          # package feed and contains everything makensis reads at build time.
+          if (-not $makensis) {
+            Write-Host '::warning::Chocolatey did not provide NSIS; falling back to the portable archive.'
+            $zip = Join-Path $env:RUNNER_TEMP 'nsis.zip'
+            $target = Join-Path $env:RUNNER_TEMP 'nsis'
+            Invoke-WebRequest -UseBasicParsing `
+              -Uri 'https://downloads.sourceforge.net/project/nsis/NSIS%203/3.13/nsis-3.13.zip' `
+              -OutFile $zip
+            Expand-Archive -LiteralPath $zip -DestinationPath $target -Force
+            $makensis = Get-ChildItem -Path $target -Filter 'makensis.exe' -Recurse |
+              Select-Object -First 1 -ExpandProperty FullName
+          }
+
+          if (-not $makensis) {
+            throw 'makensis (NSIS) is still missing after installing it via Chocolatey and the portable archive; the Windows installer cannot be built.'
+          }
+
+          # Hand the directory to the packaging step, which runs in bash.
+          $nsisDir = Split-Path -Parent $makensis
+          Write-Host "Using NSIS from $nsisDir"
+          Add-Content -Path $env:GITHUB_PATH -Value $nsisDir
+
+          # A Chocolatey install can report a non-zero code (e.g. a retried feed
+          # request) although the tool is usable now; the check above decides.
+          exit 0
 
       - name: Download Go dependencies
         run: go mod download
@@ -173,9 +228,20 @@ jobs:
               wails3 task darwin:package GOOS=darwin ARCH=${{ matrix.goarch }} VERSION="${{ env.VERSION }}" EXTRA_TAGS=liquidglass,private_mac_apis
               ;;
             windows)
-              # The choco-deployed NSIS is usually not on the runner PATH;
-              # locate makensis and prepend its directory.
-              MAKENSIS_DIR="$(dirname "$(command -v makensis || echo '/c/Program Files (x86)/NSIS/makensis.exe')")"
+              # The NSIS install step adds makensis to PATH. Fall back to the
+              # default Chocolatey deploy locations, and fail loudly instead of
+              # letting the task runner report a bare "not found in $PATH".
+              MAKENSIS_BIN="$(command -v makensis || true)"
+              for candidate in "/c/Program Files (x86)/NSIS/makensis.exe" "/c/Program Files/NSIS/makensis.exe"; do
+                if [ -z "$MAKENSIS_BIN" ] && [ -x "$candidate" ]; then
+                  MAKENSIS_BIN="$candidate"
+                fi
+              done
+              if [ -z "$MAKENSIS_BIN" ]; then
+                echo "::error::makensis (NSIS) is not available, so the Windows installer cannot be built."
+                exit 1
+              fi
+              MAKENSIS_DIR="$(dirname "$MAKENSIS_BIN")"
               export PATH="$MAKENSIS_DIR:$PATH"
               # VERSION is required here: packaging rebuilds the .exe, and without
               # it the shipped binary falls back to "dev" and About shows
