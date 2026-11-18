@@ -7,5 +7,6 @@ export {
 };
 
 export type {
-    AISettings
+    AISettings,
+    PushPreferences
 } from "./models.js";

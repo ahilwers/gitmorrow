@@ -273,6 +273,15 @@ export function GetPushInfo(): $CancellablePromise<git$0.PushInfo> {
 }
 
 /**
+ * GetPushPreferences returns the remote selection and tag choice the user
+ * confirmed in the push dialog last time for this repository. Saved is false
+ * until something has been confirmed, so the dialog keeps its defaults then.
+ */
+export function GetPushPreferences(repoPath: string): $CancellablePromise<$models.PushPreferences> {
+    return $Call.ByID(3388590743, repoPath);
+}
+
+/**
  * GetRecentRepos returns the persisted list of recently opened repository paths,
  * most recent first. Called once on app launch to seed the frontend store.
  */
@@ -400,6 +409,14 @@ export function RevealInFinder(relativePath: string): $CancellablePromise<void> 
  */
 export function SaveAISettings(s: $models.AISettings, apiKey: string, removeKey: boolean): $CancellablePromise<void> {
     return $Call.ByID(1999356331, s, apiKey, removeKey);
+}
+
+/**
+ * SavePushPreferences remembers the confirmed push dialog choice for this
+ * repository.
+ */
+export function SavePushPreferences(repoPath: string, remotes: string[] | null, pushTags: boolean): $CancellablePromise<void> {
+    return $Call.ByID(2920956854, repoPath, remotes, pushTags);
 }
 
 /**

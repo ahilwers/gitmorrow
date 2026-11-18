@@ -20,6 +20,7 @@ import type {
   StashEntry,
   Tag,
 } from '../../../../../bindings/gitmorrow/git'
+import type { PushPreferences } from '../../../../../bindings/gitmorrow/models'
 
 // Types mirroring bindings/gitmorrow/git/models.ts
 export interface GraphLine { fromCol: number; toCol: number; color: number; isMerge: boolean }
@@ -69,6 +70,9 @@ export const Fetch = vi.fn((_remote: string): Promise<void> => Promise.resolve()
 export const Pull = vi.fn((_remote: string, _branch: string): Promise<void> => Promise.resolve())
 export const PushToRemotes = vi.fn((_remotes: string[], _pushTags: boolean): Promise<void> => Promise.resolve())
 export const GetPushInfo = vi.fn(() => Promise.resolve({ repoPath: '/repo', branch: 'main', upstream: 'origin/main', remotes: ['origin'] }))
+export const GetPushPreferences = vi.fn((_repoPath: string): Promise<PushPreferences> =>
+  Promise.resolve({ remotes: [], pushTags: true, saved: false }))
+export const SavePushPreferences = vi.fn((_repoPath: string, _remotes: string[], _pushTags: boolean): Promise<void> => Promise.resolve())
 export const StoreCredentials = vi.fn((_url: string, _user: string, _pass: string): Promise<void> => Promise.resolve())
 
 // Branches & worktrees

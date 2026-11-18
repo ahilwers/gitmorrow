@@ -72,3 +72,24 @@ func TestPushToRemotesConfirmsSelectionAndPreservesNormalPush(t *testing.T) {
 		t.Fatalf("detached push error = %v", err)
 	}
 }
+
+// TestPushPreferencesRoundTrip exercises the bound wrappers, so a broken wiring
+// between the app and the preference store fails the app tests.
+func TestPushPreferencesRoundTrip(t *testing.T) {
+	configDir := t.TempDir()
+	t.Setenv("HOME", configDir)            // macOS: ~/Library/Application Support
+	t.Setenv("XDG_CONFIG_HOME", configDir) // Linux
+	t.Setenv("APPDATA", configDir)         // Windows
+
+	app := &App{}
+	if prefs := app.GetPushPreferences("/repo"); prefs.Saved || len(prefs.Remotes) != 0 {
+		t.Fatalf("unknown repository returned %+v", prefs)
+	}
+	if err := app.SavePushPreferences("/repo", []string{"origin", "fork"}, false); err != nil {
+		t.Fatal(err)
+	}
+	prefs := app.GetPushPreferences("/repo")
+	if !prefs.Saved || prefs.PushTags || len(prefs.Remotes) != 2 || prefs.Remotes[1] != "fork" {
+		t.Fatalf("remembered choice = %+v", prefs)
+	}
+}

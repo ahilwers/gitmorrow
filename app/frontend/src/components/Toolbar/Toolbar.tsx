@@ -17,7 +17,8 @@ import { RefreshCw, ArrowDown, ArrowUp, GitBranch, Layers, Tag, Search, ChevronD
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { useGitStore } from '@/stores/gitStore'
 import { useStatus } from '@/hooks/useStatus'
-import { SelectRepository, OpenRepository, Fetch, PullForUI, ResolvePull, PushToRemotes, GetPushInfo, SelectAndInitRepository } from '@bindings/gitmorrow/app'
+import { SelectRepository, OpenRepository, Fetch, PullForUI, ResolvePull, PushToRemotes, GetPushInfo, GetPushPreferences, SavePushPreferences, SelectAndInitRepository } from '@bindings/gitmorrow/app'
+import type { PushPreferences } from '@bindings/gitmorrow/models'
 import { PushDialog } from './PushDialog'
 import { parseGitError } from '@/lib/format'
 import { useQueryClient } from '@tanstack/react-query'
@@ -41,6 +42,9 @@ export default function Toolbar() {
   const [pullLoading, setPullLoading] = useState(false)
   const [pushLoading, setPushLoading] = useState(false)
   const [pushInfo, setPushInfo] = useState<PushInfo | null>(null)
+  // Remembered dialog choice for the repository, loaded together with the push
+  // info so the dialog opens exactly as the user confirmed it last time.
+  const [pushPreferences, setPushPreferences] = useState<PushPreferences | null>(null)
   const [createDialog, setCreateDialog] = useState<{ kind: 'branch' | 'stash' | 'tag'; repo: string; worktree: string | null } | null>(null)
 
   const openCreateDialog = (kind: 'branch' | 'stash' | 'tag') => {
@@ -61,7 +65,7 @@ export default function Toolbar() {
     return () => window.removeEventListener('git:create', onCreate)
   }, [activeRepo, activeWorktree])
 
-  useEffect(() => { setPushInfo(null) }, [activeRepo])
+  useEffect(() => { setPushInfo(null); setPushPreferences(null) }, [activeRepo])
 
   const [pullChoice, setPullChoice] = useState<PullSnapshot | null>(null)
   const pullGeneration = useRef(0)
@@ -193,6 +197,16 @@ export default function Toolbar() {
     try {
       const info = await GetPushInfo()
       if (useGitStore.getState().activeRepo !== activeRepo) return
+      let preferences: PushPreferences | null = null
+      try {
+        preferences = await GetPushPreferences(info.repoPath)
+      } catch {
+        // The remembered choice is a convenience: the dialog falls back to its
+        // defaults when it cannot be read.
+        preferences = null
+      }
+      if (useGitStore.getState().activeRepo !== activeRepo) return
+      setPushPreferences(preferences)
       setPushInfo(info)
     } catch (err) {
       showFlash(parseGitError(err), 'danger')
@@ -204,10 +218,17 @@ export default function Toolbar() {
   const handleConfirmedPush = async (remotes: string[], pushTags: boolean) => {
     const info = pushInfo
     setPushInfo(null)
+    setPushPreferences(null)
     if (!info || useGitStore.getState().activeRepo !== activeRepo) return
     setPushLoading(true)
     setLoadingOperation('Pushing…')
     try {
+      // Remember the choice before pushing, so a failed push does not lose it.
+      try {
+        await SavePushPreferences(info.repoPath, remotes, pushTags)
+      } catch {
+        // Pushing must not depend on the preference file being writable.
+      }
       await PushToRemotes(remotes, pushTags)
       showFlash('Pushed successfully')
       queryClient.invalidateQueries()
@@ -401,7 +422,8 @@ export default function Toolbar() {
       {currentDialog?.kind === 'branch' && <NewBranchDialog onClose={() => setCreateDialog(null)} />}
       {currentDialog?.kind === 'stash' && <CreateStashDialog onClose={() => setCreateDialog(null)} />}
       {currentDialog?.kind === 'tag' && <CreateTagDialog onClose={() => setCreateDialog(null)} />}
-      {pushInfo && <PushDialog info={pushInfo} onConfirm={handleConfirmedPush} onClose={() => setPushInfo(null)} />}
+      {pushInfo && <PushDialog info={pushInfo} preferences={pushPreferences ?? undefined} onConfirm={handleConfirmedPush}
+        onClose={() => { setPushInfo(null); setPushPreferences(null) }} />}
       {remoteDialogOpen && <ManageRemotesDialog onClose={() => setRemoteDialogOpen(false)} />}
       {pullChoice && pullChoice.repo === activeRepo && pullChoice.branch === branch && <PullStrategyDialog branch={pullChoice.branch} onClose={() => setPullChoice(null)} onChoose={strategy => handlePull(strategy)} />}
       <KeyboardShortcutsDialog />

@@ -14,22 +14,32 @@ import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as Dialog from '@radix-ui/react-dialog'
 import type { PushInfo } from '@bindings/gitmorrow/git'
+import type { PushPreferences } from '@bindings/gitmorrow/models'
 
 interface Props {
   info: PushInfo
+  preferences?: PushPreferences
   onConfirm: (remotes: string[], pushTags: boolean) => void
   onClose: () => void
 }
 
-export function PushDialog({ info, onConfirm, onClose }: Props) {
+// Initial remote selection: the choice the user confirmed last time for this
+// repository, limited to remotes that still exist. Without a remembered choice
+// — or when every remembered remote has been renamed or removed — all
+// configured remotes are selected, because pushing usually means publishing
+// everywhere the user mirrors this repository.
+function initialRemotes(remotes: string[], preferences?: PushPreferences): string[] {
+  const remembered = preferences?.saved ? (preferences.remotes ?? []).filter(remote => remotes.includes(remote)) : []
+  return remembered.length > 0 ? remembered : remotes
+}
+
+export function PushDialog({ info, preferences, onConfirm, onClose }: Props) {
   const { t } = useTranslation()
-  // All configured remotes are selected by default: pushing usually means
-  // publishing everywhere the user mirrors this repository.
   const remotes = useMemo(() => info.remotes ?? [], [info.remotes])
-  const [selected, setSelected] = useState<string[]>(remotes)
-  // Tags stay on by default so a push keeps behaving like before; the user can
-  // turn them off when the remote rejects tag creation.
-  const [pushTags, setPushTags] = useState(true)
+  const [selected, setSelected] = useState<string[]>(() => initialRemotes(remotes, preferences))
+  // Tags stay on unless the user turned them off for this repository last time:
+  // the remote may reject tag creation, and the answer must survive the dialog.
+  const [pushTags, setPushTags] = useState(() => (preferences?.saved ? preferences.pushTags : true))
   const cancelRef = useRef<HTMLButtonElement>(null)
 
   const toggleRemote = (remote: string) => {

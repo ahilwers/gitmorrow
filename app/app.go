@@ -20,6 +20,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	gitpkg "gitmorrow/git"
+	"gitmorrow/internal/pushprefs"
 	"gitmorrow/internal/sysproc"
 )
 
@@ -373,6 +374,29 @@ func (a *App) GetPushInfo() (gitpkg.PushInfo, error) {
 		return gitpkg.PushInfo{}, gitpkg.ErrNotARepo
 	}
 	return a.repo.GetPushInfo()
+}
+
+// PushPreferences is the push dialog choice the user confirmed for a repository
+// last time. Saved is false while nothing has been confirmed for that repository
+// yet, so the dialog keeps its defaults then.
+type PushPreferences struct {
+	Remotes  []string `json:"remotes"`
+	PushTags bool     `json:"pushTags"`
+	Saved    bool     `json:"saved"`
+}
+
+// GetPushPreferences returns the remote selection and tag choice the user
+// confirmed in the push dialog last time for this repository. Saved is false
+// until something has been confirmed, so the dialog keeps its defaults then.
+func (a *App) GetPushPreferences(repoPath string) PushPreferences {
+	saved := pushprefs.Load(repoPath)
+	return PushPreferences{Remotes: saved.Remotes, PushTags: saved.PushTags, Saved: saved.Saved}
+}
+
+// SavePushPreferences remembers the confirmed push dialog choice for this
+// repository.
+func (a *App) SavePushPreferences(repoPath string, remotes []string, pushTags bool) error {
+	return pushprefs.Save(repoPath, remotes, pushTags)
 }
 
 // StoreCredentials writes credentials into the configured git credential helper.

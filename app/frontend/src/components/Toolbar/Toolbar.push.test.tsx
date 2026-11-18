@@ -12,7 +12,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { GetPushInfo, GetStatus, PushToRemotes } from '@bindings/gitmorrow/app'
+import { GetPushInfo, GetPushPreferences, GetStatus, PushToRemotes, SavePushPreferences } from '@bindings/gitmorrow/app'
 import { useGitStore } from '@/stores/gitStore'
 import Toolbar from './Toolbar'
 import i18n from '@/i18n'
@@ -36,6 +36,8 @@ describe('push dialog', () => {
     vi.clearAllMocks()
     vi.mocked(GetStatus).mockReset().mockResolvedValue({ branch: 'feature/new', ahead: 1, behind: 0, files: [], hasConflicts: false })
     vi.mocked(GetPushInfo).mockResolvedValue(untracked)
+    vi.mocked(GetPushPreferences).mockReset().mockResolvedValue({ remotes: [], pushTags: true, saved: false })
+    vi.mocked(SavePushPreferences).mockReset().mockResolvedValue(undefined)
     vi.mocked(PushToRemotes).mockResolvedValue(undefined)
     useGitStore.setState({ activeRepo: '/repo', recentRepos: [], flash: null, loadingOperation: null })
   })
@@ -72,6 +74,59 @@ describe('push dialog', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Push' }))
 
     await waitFor(() => expect(PushToRemotes).toHaveBeenCalledWith(['origin'], false))
+  })
+
+  it('reopens with the remembered remotes and tag choice', async () => {
+    vi.mocked(GetPushInfo).mockResolvedValue({ ...untracked, upstream: 'origin/feature/new', remotes: ['origin', 'fork'] })
+    vi.mocked(GetPushPreferences).mockResolvedValue({ remotes: ['fork'], pushTags: false, saved: true })
+    renderToolbar()
+
+    const dialog = await pushDialog()
+    expect(GetPushPreferences).toHaveBeenCalledWith('/repo')
+    expect(within(dialog).getByRole('checkbox', { name: 'fork' })).toBeChecked()
+    expect(within(dialog).getByRole('checkbox', { name: 'origin' })).not.toBeChecked()
+    expect(within(dialog).getByRole('checkbox', { name: 'Also push tags' })).not.toBeChecked()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Push' }))
+    await waitFor(() => expect(PushToRemotes).toHaveBeenCalledWith(['fork'], false))
+  })
+
+  it('falls back to every remote when the remembered remotes are gone', async () => {
+    vi.mocked(GetPushInfo).mockResolvedValue({ ...untracked, upstream: 'origin/feature/new', remotes: ['origin', 'fork'] })
+    vi.mocked(GetPushPreferences).mockResolvedValue({ remotes: ['old-mirror'], pushTags: false, saved: true })
+    renderToolbar()
+
+    const dialog = await pushDialog()
+    expect(within(dialog).getByRole('checkbox', { name: 'origin' })).toBeChecked()
+    expect(within(dialog).getByRole('checkbox', { name: 'fork' })).toBeChecked()
+    // The tag choice is per repository, so it still applies.
+    expect(within(dialog).getByRole('checkbox', { name: 'Also push tags' })).not.toBeChecked()
+  })
+
+  it('remembers the confirmed choice before pushing', async () => {
+    vi.mocked(GetPushInfo).mockResolvedValue({ ...untracked, upstream: 'origin/feature/new', remotes: ['origin', 'fork'] })
+    renderToolbar()
+
+    const dialog = await pushDialog()
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'fork' }))
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Also push tags' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Push' }))
+
+    await waitFor(() => expect(SavePushPreferences).toHaveBeenCalledWith('/repo', ['origin'], false))
+    await waitFor(() => expect(PushToRemotes).toHaveBeenCalledWith(['origin'], false))
+    // A failed push must not lose the remembered answer, so it is stored first.
+    expect(vi.mocked(SavePushPreferences).mock.invocationCallOrder[0])
+      .toBeLessThan(vi.mocked(PushToRemotes).mock.invocationCallOrder[0])
+  })
+
+  it('pushes even when the remembered choice cannot be saved', async () => {
+    vi.mocked(SavePushPreferences).mockRejectedValueOnce(new Error('config directory is read-only'))
+    renderToolbar()
+
+    fireEvent.click(within(await pushDialog()).getByRole('button', { name: 'Push' }))
+
+    await waitFor(() => expect(PushToRemotes).toHaveBeenCalledWith(['origin'], true))
+    await waitFor(() => expect(useGitStore.getState().flash?.message).toBe('Pushed successfully'))
   })
 
   it('refuses to push when no remote is selected', async () => {
