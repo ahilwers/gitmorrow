@@ -10,9 +10,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { GetPushInfo, GetStatus, Push } from '@bindings/gitmorrow/app'
+import { GetPushInfo, GetStatus, PushToRemotes } from '@bindings/gitmorrow/app'
 import { useGitStore } from '@/stores/gitStore'
 import i18n from '@/i18n'
 import Toolbar from './Toolbar'
@@ -29,7 +29,7 @@ const badge = () => pushButton().querySelector('.toolbar-icon-badge')
 beforeEach(() => {
   vi.mocked(GetStatus).mockReset().mockResolvedValue(status)
   vi.mocked(GetPushInfo).mockReset().mockResolvedValue({ repoPath: '/repo', branch: 'main', upstream: 'origin/main', remotes: ['origin'] })
-  vi.mocked(Push).mockReset().mockResolvedValue(undefined)
+  vi.mocked(PushToRemotes).mockReset().mockResolvedValue(undefined)
   useGitStore.setState({ activeRepo: '/repo', activeWorktree: null, recentRepos: [], loadingOperation: null })
 })
 afterEach(async () => { cleanup(); await i18n.changeLanguage('en') })
@@ -92,11 +92,12 @@ describe('push commit badge', () => {
 
   it('keeps the count while pushing and clears it after successful status refresh', async () => {
     let resolve!: () => void
-    vi.mocked(Push).mockReturnValue(new Promise<void>(done => { resolve = done }))
+    vi.mocked(PushToRemotes).mockReturnValue(new Promise<void>(done => { resolve = done }))
     renderToolbar()
     await waitFor(() => expect(badge()).toHaveTextContent('3'))
     fireEvent.click(pushButton())
-    await waitFor(() => expect(Push).toHaveBeenCalled())
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Push branch' })).getByRole('button', { name: 'Push' }))
+    await waitFor(() => expect(PushToRemotes).toHaveBeenCalled())
     expect(pushButton()).toBeDisabled()
     expect(badge()).toHaveTextContent('3')
     vi.mocked(GetStatus).mockResolvedValue({ ...status, ahead: 0 })
@@ -105,11 +106,12 @@ describe('push commit badge', () => {
   })
 
   it('preserves the badge after a failed push', async () => {
-    vi.mocked(Push).mockRejectedValue(new Error('push failed'))
+    vi.mocked(PushToRemotes).mockRejectedValue(new Error('push failed'))
     renderToolbar()
     await waitFor(() => expect(badge()).toHaveTextContent('3'))
     fireEvent.click(pushButton())
-    await waitFor(() => expect(Push).toHaveBeenCalled())
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Push branch' })).getByRole('button', { name: 'Push' }))
+    await waitFor(() => expect(PushToRemotes).toHaveBeenCalled())
     await waitFor(() => expect(pushButton()).toBeEnabled())
     expect(badge()).toHaveTextContent('3')
   })

@@ -10,9 +10,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { GetPushInfo, Push, PushWithUpstream } from '@bindings/gitmorrow/app'
+import { GetPushInfo, GetPushPreferences, GetStatus, PushToRemotes, SavePushPreferences } from '@bindings/gitmorrow/app'
 import { useGitStore } from '@/stores/gitStore'
 import Toolbar from './Toolbar'
 import i18n from '@/i18n'
@@ -27,62 +27,142 @@ function renderToolbar() {
 
 const untracked = { repoPath: '/repo', branch: 'feature/new', upstream: '', remotes: ['origin'] }
 
-describe('push upstream confirmation', () => {
+async function pushDialog() {
+  return screen.findByRole('dialog', { name: 'Push branch' })
+}
+
+describe('push dialog', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    useGitStore.setState({ activeRepo: '/repo', recentRepos: [], flash: null, loadingOperation: null })
+    vi.mocked(GetStatus).mockReset().mockResolvedValue({ branch: 'feature/new', ahead: 1, behind: 0, files: [], hasConflicts: false })
     vi.mocked(GetPushInfo).mockResolvedValue(untracked)
-    vi.mocked(PushWithUpstream).mockResolvedValue(undefined)
+    vi.mocked(GetPushPreferences).mockReset().mockResolvedValue({ remotes: [], pushTags: true, saved: false })
+    vi.mocked(SavePushPreferences).mockReset().mockResolvedValue(undefined)
+    vi.mocked(PushToRemotes).mockResolvedValue(undefined)
+    useGitStore.setState({ activeRepo: '/repo', recentRepos: [], flash: null, loadingOperation: null })
   })
   afterEach(async () => {
     cleanup()
     await i18n.changeLanguage('en')
   })
 
-  it('renders German dialog text and accessible controls while preserving the selected upstream', async () => {
-    await i18n.changeLanguage('de')
-    vi.mocked(GetPushInfo).mockResolvedValue({ ...untracked, remotes: ['origin', 'fork'] })
-    renderToolbar()
-    const dialog = await screen.findByRole('dialog', { name: 'Upstream-Branch erstellen?' })
-    expect(dialog).toHaveTextContent('Branch feature/new hat keinen Upstream.')
-    expect(screen.getByRole('button', { name: 'Abbrechen' })).toHaveFocus()
-    const confirm = screen.getByRole('button', { name: 'Upstream erstellen & pushen' })
-    expect(confirm).toBeDisabled()
-    expect(screen.getByRole('option', { name: 'Remote auswählen…' })).toBeInTheDocument()
-    fireEvent.change(screen.getByRole('combobox', { name: 'Remote-Repository' }), { target: { value: 'fork' } })
-    expect(screen.getByText('Upstream-Branch: fork/feature/new')).toBeInTheDocument()
-    expect(PushWithUpstream).not.toHaveBeenCalled()
-    fireEvent.click(confirm)
-    await waitFor(() => expect(PushWithUpstream).toHaveBeenCalledWith('/repo', 'fork', 'feature/new'))
-  })
-
-  it('renders missing-remote guidance in German without allowing a push', async () => {
-    await i18n.changeLanguage('de')
-    vi.mocked(GetPushInfo).mockResolvedValue({ ...untracked, remotes: [] })
-    renderToolbar()
-    expect(await screen.findByRole('dialog')).toHaveTextContent('Keine Remotes konfiguriert.')
-    expect(screen.getByRole('button', { name: 'Upstream erstellen & pushen' })).toBeDisabled()
-    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }))
-    expect(PushWithUpstream).not.toHaveBeenCalled()
-  })
-
-  it('does not push until explicit confirmation and refreshes after success', async () => {
+  it('selects every remote and pushes tags by default', async () => {
+    vi.mocked(GetPushInfo).mockResolvedValue({ ...untracked, upstream: 'origin/feature/new', remotes: ['origin', 'fork'] })
     const invalidate = renderToolbar()
-    expect(await screen.findByRole('dialog')).toHaveTextContent('feature/new')
-    expect(Push).not.toHaveBeenCalled()
-    expect(PushWithUpstream).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus()
-    fireEvent.click(screen.getByRole('button', { name: 'Create Upstream & Push' }))
-    await waitFor(() => expect(PushWithUpstream).toHaveBeenCalledWith('/repo', 'origin', 'feature/new'))
+
+    const dialog = await pushDialog()
+    expect(within(dialog).getByRole('checkbox', { name: 'origin' })).toBeChecked()
+    expect(within(dialog).getByRole('checkbox', { name: 'fork' })).toBeChecked()
+    expect(within(dialog).getByRole('checkbox', { name: 'Also push tags' })).toBeChecked()
+    expect(PushToRemotes).not.toHaveBeenCalled()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Push' }))
+
+    await waitFor(() => expect(PushToRemotes).toHaveBeenCalledWith(['origin', 'fork'], true))
     await waitFor(() => expect(useGitStore.getState().flash?.message).toBe('Pushed successfully'))
     expect(invalidate).toHaveBeenCalled()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
+  it('pushes only the selected remotes and without tags when the user opts out', async () => {
+    vi.mocked(GetPushInfo).mockResolvedValue({ ...untracked, upstream: 'origin/feature/new', remotes: ['origin', 'fork'] })
+    renderToolbar()
+
+    const dialog = await pushDialog()
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'fork' }))
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Also push tags' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Push' }))
+
+    await waitFor(() => expect(PushToRemotes).toHaveBeenCalledWith(['origin'], false))
+  })
+
+  it('reopens with the remembered remotes and tag choice', async () => {
+    vi.mocked(GetPushInfo).mockResolvedValue({ ...untracked, upstream: 'origin/feature/new', remotes: ['origin', 'fork'] })
+    vi.mocked(GetPushPreferences).mockResolvedValue({ remotes: ['fork'], pushTags: false, saved: true })
+    renderToolbar()
+
+    const dialog = await pushDialog()
+    expect(GetPushPreferences).toHaveBeenCalledWith('/repo')
+    expect(within(dialog).getByRole('checkbox', { name: 'fork' })).toBeChecked()
+    expect(within(dialog).getByRole('checkbox', { name: 'origin' })).not.toBeChecked()
+    expect(within(dialog).getByRole('checkbox', { name: 'Also push tags' })).not.toBeChecked()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Push' }))
+    await waitFor(() => expect(PushToRemotes).toHaveBeenCalledWith(['fork'], false))
+  })
+
+  it('falls back to every remote when the remembered remotes are gone', async () => {
+    vi.mocked(GetPushInfo).mockResolvedValue({ ...untracked, upstream: 'origin/feature/new', remotes: ['origin', 'fork'] })
+    vi.mocked(GetPushPreferences).mockResolvedValue({ remotes: ['old-mirror'], pushTags: false, saved: true })
+    renderToolbar()
+
+    const dialog = await pushDialog()
+    expect(within(dialog).getByRole('checkbox', { name: 'origin' })).toBeChecked()
+    expect(within(dialog).getByRole('checkbox', { name: 'fork' })).toBeChecked()
+    // The tag choice is per repository, so it still applies.
+    expect(within(dialog).getByRole('checkbox', { name: 'Also push tags' })).not.toBeChecked()
+  })
+
+  it('remembers the confirmed choice before pushing', async () => {
+    vi.mocked(GetPushInfo).mockResolvedValue({ ...untracked, upstream: 'origin/feature/new', remotes: ['origin', 'fork'] })
+    renderToolbar()
+
+    const dialog = await pushDialog()
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'fork' }))
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Also push tags' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Push' }))
+
+    await waitFor(() => expect(SavePushPreferences).toHaveBeenCalledWith('/repo', ['origin'], false))
+    await waitFor(() => expect(PushToRemotes).toHaveBeenCalledWith(['origin'], false))
+    // A failed push must not lose the remembered answer, so it is stored first.
+    expect(vi.mocked(SavePushPreferences).mock.invocationCallOrder[0])
+      .toBeLessThan(vi.mocked(PushToRemotes).mock.invocationCallOrder[0])
+  })
+
+  it('pushes even when the remembered choice cannot be saved', async () => {
+    vi.mocked(SavePushPreferences).mockRejectedValueOnce(new Error('config directory is read-only'))
+    renderToolbar()
+
+    fireEvent.click(within(await pushDialog()).getByRole('button', { name: 'Push' }))
+
+    await waitFor(() => expect(PushToRemotes).toHaveBeenCalledWith(['origin'], true))
+    await waitFor(() => expect(useGitStore.getState().flash?.message).toBe('Pushed successfully'))
+  })
+
+  it('refuses to push when no remote is selected', async () => {
+    vi.mocked(GetPushInfo).mockResolvedValue({ ...untracked, remotes: ['origin', 'fork'] })
+    renderToolbar()
+
+    const dialog = await pushDialog()
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'origin' }))
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'fork' }))
+    expect(within(dialog).getByRole('button', { name: 'Push' })).toBeDisabled()
+  })
+
+  it('explains which remote becomes the upstream for an untracked branch', async () => {
+    vi.mocked(GetPushInfo).mockResolvedValue({ ...untracked, remotes: ['origin', 'fork'] })
+    renderToolbar()
+
+    const dialog = await pushDialog()
+    expect(within(dialog).getByText('origin becomes the upstream for feature/new.')).toBeInTheDocument()
+
+    // Dropping origin makes the next selected remote the upstream.
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'origin' }))
+    expect(within(dialog).getByText('fork becomes the upstream for feature/new.')).toBeInTheDocument()
+  })
+
+  it('does not mention an upstream when the branch is already tracked', async () => {
+    vi.mocked(GetPushInfo).mockResolvedValue({ ...untracked, upstream: 'origin/feature/new' })
+    renderToolbar()
+
+    const dialog = await pushDialog()
+    expect(within(dialog).queryByText(/becomes the upstream/)).not.toBeInTheDocument()
+  })
+
   it.each(['Cancel', 'Escape', 'outside'])('does not write on %s dismissal', async method => {
     renderToolbar()
-    const dialog = await screen.findByRole('dialog')
-    if (method === 'Cancel') fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    const dialog = await pushDialog()
+    if (method === 'Cancel') fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
     else if (method === 'Escape') fireEvent.keyDown(dialog, { key: 'Escape' })
     else {
       const outside = dialog.previousElementSibling!
@@ -91,63 +171,45 @@ describe('push upstream confirmation', () => {
       fireEvent.click(outside)
     }
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(Push).not.toHaveBeenCalled()
-    expect(PushWithUpstream).not.toHaveBeenCalled()
-  })
-
-  it('requires a choice with multiple remotes and uses the selected remote', async () => {
-    vi.mocked(GetPushInfo).mockResolvedValue({ ...untracked, remotes: ['origin', 'fork'] })
-    renderToolbar()
-    const confirm = await screen.findByRole('button', { name: 'Create Upstream & Push' })
-    expect(confirm).toBeDisabled()
-    fireEvent.change(screen.getByRole('combobox', { name: 'Remote' }), { target: { value: 'fork' } })
-    expect(screen.getByText('Upstream: fork/feature/new')).toBeInTheDocument()
-    fireEvent.click(confirm)
-    await waitFor(() => expect(PushWithUpstream).toHaveBeenCalledWith('/repo', 'fork', 'feature/new'))
+    expect(PushToRemotes).not.toHaveBeenCalled()
   })
 
   it('explains missing remotes without allowing a push', async () => {
     vi.mocked(GetPushInfo).mockResolvedValue({ ...untracked, remotes: [] })
     renderToolbar()
-    expect(await screen.findByRole('dialog')).toHaveTextContent('No remotes configured')
-    expect(screen.getByRole('button', { name: 'Create Upstream & Push' })).toBeDisabled()
-    expect(Push).not.toHaveBeenCalled()
-    expect(PushWithUpstream).not.toHaveBeenCalled()
+
+    const dialog = await pushDialog()
+    expect(dialog).toHaveTextContent('No remotes configured')
+    expect(within(dialog).getByRole('button', { name: 'Push' })).toBeDisabled()
+    expect(PushToRemotes).not.toHaveBeenCalled()
   })
 
-  it('preserves normal push for a tracked branch', async () => {
-    vi.mocked(GetPushInfo).mockResolvedValue({ ...untracked, upstream: 'origin/feature/new' })
-    renderToolbar()
-    await waitFor(() => expect(Push).toHaveBeenCalledWith('', '', false))
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(PushWithUpstream).not.toHaveBeenCalled()
-  })
-
-  it('reports detached HEAD and other preflight failures without writing', async () => {
+  it('reports detached HEAD and other preflight failures without opening the dialog', async () => {
     vi.mocked(GetPushInfo).mockRejectedValueOnce(new Error('cannot push from detached HEAD'))
     renderToolbar()
+
     await waitFor(() => expect(useGitStore.getState().flash?.message).toContain('detached HEAD'))
-    expect(Push).not.toHaveBeenCalled()
-    expect(PushWithUpstream).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(PushToRemotes).not.toHaveBeenCalled()
+  })
+
+  it('preserves the git error and clears loading after a failed confirmed push', async () => {
+    vi.mocked(PushToRemotes).mockRejectedValueOnce(new Error('push to origin failed: authentication failed'))
+    renderToolbar()
+
+    fireEvent.click(within(await pushDialog()).getByRole('button', { name: 'Push' }))
+
+    await waitFor(() => expect(useGitStore.getState().flash?.message).toContain('authentication failed'))
+    expect(useGitStore.getState().loadingOperation).toBeNull()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('preserves authentication errors and clears loading after a failed confirmed push', async () => {
-    vi.mocked(PushWithUpstream).mockRejectedValueOnce(new Error('git: authentication failed'))
+  it('dismisses the dialog when the active repository changes', async () => {
     renderToolbar()
-    fireEvent.click(await screen.findByRole('button', { name: 'Create Upstream & Push' }))
-    await waitFor(() => expect(useGitStore.getState().flash?.message).toContain('authentication failed'))
-    expect(useGitStore.getState().loadingOperation).toBeNull()
-    expect(screen.getByRole('button', { name: 'Push' })).toBeEnabled()
-    expect(Push).not.toHaveBeenCalled()
-  })
-
-  it('dismisses confirmation when the active repository changes', async () => {
-    renderToolbar()
-    await screen.findByRole('dialog')
+    await pushDialog()
     act(() => useGitStore.setState({ activeRepo: '/other' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(PushWithUpstream).not.toHaveBeenCalled()
+    expect(PushToRemotes).not.toHaveBeenCalled()
   })
 
   it('discards a preflight result for a repository that is no longer active', async () => {
@@ -157,7 +219,19 @@ describe('push upstream confirmation', () => {
     act(() => useGitStore.setState({ activeRepo: '/other' }))
     await act(async () => { resolve(untracked) })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(Push).not.toHaveBeenCalled()
-    expect(PushWithUpstream).not.toHaveBeenCalled()
+    expect(PushToRemotes).not.toHaveBeenCalled()
+  })
+
+  it('renders the dialog in German', async () => {
+    await i18n.changeLanguage('de')
+    vi.mocked(GetPushInfo).mockResolvedValue({ ...untracked, remotes: ['origin', 'fork'] })
+    renderToolbar()
+
+    const dialog = await screen.findByRole('dialog', { name: 'Branch pushen' })
+    expect(dialog).toHaveTextContent('feature/new in die ausgewählten Remotes veröffentlichen.')
+    expect(within(dialog).getByRole('checkbox', { name: 'Tags ebenfalls pushen' })).toBeChecked()
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toHaveFocus()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Pushen' }))
+    await waitFor(() => expect(PushToRemotes).toHaveBeenCalledWith(['origin', 'fork'], true))
   })
 })

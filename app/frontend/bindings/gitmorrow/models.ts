@@ -10,3 +10,14 @@ export interface AISettings {
     "model": string;
     "hasAPIKey": boolean;
 }
+
+/**
+ * PushPreferences is the push dialog choice the user confirmed for a repository
+ * last time. Saved is false while nothing has been confirmed for that repository
+ * yet, so the dialog keeps its defaults then.
+ */
+export interface PushPreferences {
+    "remotes": string[] | null;
+    "pushTags": boolean;
+    "saved": boolean;
+}
