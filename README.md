@@ -51,7 +51,8 @@ The project website with screenshots, a feature overview, and download links is
 - **Your credentials stay yours** — authentication is delegated to Git's native helpers: the SSH
   agent, macOS Keychain, and Windows Credential Manager. GitMorrow never stores your credentials.
 - **Auto-updates** — Sparkle (macOS), WinSparkle (Windows), and AppImageUpdate (Linux).
-- **AI-assisted commit messages** — optional AI-generated commit messages right from the commit box.
+- **AI-assisted commit messages** — optional AI-generated commit messages right from the commit box,
+  using an API key or a local assistant CLI you are already signed in to.
 
 ## Platform support
 
@@ -60,6 +61,57 @@ The project website with screenshots, a feature overview, and download links is
 | macOS | 12 Monterey | `.dmg` (Intel & Apple Silicon) |
 | Windows | 10 21H2 | NSIS installer (`.exe`) |
 | Linux | modern distros | AppImage |
+
+## AI commit messages
+
+The commit box has a **Generate with AI** button. It reads the staged diff (up to 512 KiB), asks for
+a commit message, and shows the suggestion in a preview — nothing is committed automatically. Open
+**AI settings** next to the button and pick one of two authentication modes.
+
+### Local CLI (no API key in GitMorrow)
+
+GitMorrow writes the instruction and the staged diff to the standard input of a CLI that is already
+installed and signed in on your machine. It never reads or stores that CLI's credentials, and it does
+not run the command through a shell. The presets map to these non-interactive entry points:
+
+| Preset | Command GitMorrow runs |
+|---|---|
+| Claude Code | `claude -p` |
+| Codex CLI | `codex exec` |
+| Copilot CLI | `copilot -p` |
+
+Setup:
+
+1. Install and sign in to one of these CLIs, and check that it answers in a terminal.
+2. In GitMorrow, open **AI settings**, set **Authentication** to **Local CLI**, and choose the CLI.
+3. Leave **Executable path** blank to use the command from `PATH`, or enter the full path to the
+   executable when the command is not on `PATH` — typical on macOS, where an app started from Finder
+   does not inherit your shell's `PATH`.
+4. Save the settings, stage some changes, and press **Generate with AI**.
+
+For a CLI that is not in the list, choose **Custom command** and enter the path of an executable that
+reads the prompt from standard input and prints the message to standard output. GitMorrow passes no
+arguments of its own in this mode, so a small wrapper script is the easiest way to add flags:
+
+```bash
+#!/bin/sh
+# ~/bin/my-commit-helper — reads the prompt on stdin, prints the message on stdout
+exec /path/to/your-cli --model some-model --print
+```
+
+If the CLI is missing, fails, or does not answer within 45 seconds, GitMorrow shows the CLI's own
+error message or exit code instead of a generic one.
+
+### API key
+
+Set **Authentication** to **API key** and enter a provider (OpenRouter or any OpenAI-compatible
+endpoint), the base URL, and the model ID. The key is stored in the OS credential store — on macOS
+the Keychain, on Windows the Credential Manager, on Linux the Secret Service — never in a repository
+file. Keys are scoped to the base URL, so changing the URL requires entering the key again. HTTPS is
+required; plain HTTP is accepted for `localhost` only.
+
+In both modes the staged diff, including code and file paths, leaves your machine — check it for
+secrets before generating, and check your provider's data policy.
 
 ## Building from source
 
