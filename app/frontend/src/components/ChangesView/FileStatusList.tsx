@@ -402,17 +402,38 @@ export function FileStatusList({ selectedFile, selectedStaged, onSelectFile, nex
   // Cmd/Ctrl+S and Cmd/Ctrl+D act on the selection as well. The panel's own
   // onKeyDown runs first and marks the event as handled, so this listener only
   // covers the case where the focus is outside the file list.
+  //
+  // The diff panel owns the keyboard while it has the focus, but the actions
+  // belong to this list's selection, so its plain S/U/D shortcuts are honoured
+  // here too: the shown change can be staged, unstaged or discarded without
+  // moving the focus back to the list.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return
-      if (!(event.metaKey || event.ctrlKey)) return
       const target = event.target as HTMLElement | null
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
       if (contextMenu || discardConfirm || bulkDiscard) return
       const key = event.key.toLowerCase()
+      if (event.metaKey || event.ctrlKey) {
+        if (key === 's') {
+          event.preventDefault()
+          stageCurrent()
+        } else if (key === 'd') {
+          event.preventDefault()
+          discardCurrent()
+        }
+        return
+      }
+      if (event.altKey) return
+      // Keys pressed on a button belong to that button.
+      if (target && target.tagName === 'BUTTON') return
+      if (!target?.closest('[data-panel="changes-diff"]')) return
       if (key === 's') {
         event.preventDefault()
         stageCurrent()
+      } else if (key === 'u') {
+        event.preventDefault()
+        unstageCurrent()
       } else if (key === 'd') {
         event.preventDefault()
         discardCurrent()
@@ -420,7 +441,7 @@ export function FileStatusList({ selectedFile, selectedStaged, onSelectFile, nex
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [stageCurrent, discardCurrent, contextMenu, discardConfirm, bulkDiscard])
+  }, [stageCurrent, unstageCurrent, discardCurrent, contextMenu, discardConfirm, bulkDiscard])
 
   return (
     <>

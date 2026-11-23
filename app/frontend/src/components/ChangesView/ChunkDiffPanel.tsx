@@ -226,6 +226,9 @@ export function ChunkDiffPanel({ filePath, staged, fileStatus }: ChunkDiffPanelP
         <KeyHints hints={[
           { keys: ['↑', '↓'], label: 'Scroll' },
           { keys: ['PgUp', 'PgDn'], label: 'Page' },
+          { keys: ['S'], label: 'Stage' },
+          { keys: ['U'], label: 'Unstage' },
+          { keys: ['D'], label: 'Discard' },
           { keys: ['Tab'], label: 'Commit' },
           { keys: ['Esc'], label: 'Files' },
         ]} />
