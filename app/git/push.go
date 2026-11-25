@@ -27,16 +27,28 @@ type PushInfo struct {
 	Remotes  []string `json:"remotes"`
 }
 
+// currentPushBranch resolves the branch to publish from the worktree the
+// repository currently points at. It uses CLI-git so a linked worktree reports
+// its own HEAD: SwitchPath only changes the CLI working directory, while the
+// shared go-git repository object keeps the main worktree's HEAD.
+func (r *Repository) currentPushBranch() (string, error) {
+	branch, err := r.CurrentBranch()
+	if err != nil {
+		return "", err
+	}
+	if branch == "HEAD" {
+		return "", fmt.Errorf("cannot push from detached HEAD; check out a branch first")
+	}
+	return branch, nil
+}
+
 func (r *Repository) GetPushInfo() (PushInfo, error) {
 	info := PushInfo{RepoPath: r.Path, Remotes: []string{}}
-	head, err := r.repo.Head()
+	branch, err := r.currentPushBranch()
 	if err != nil {
 		return info, err
 	}
-	if !head.Name().IsBranch() {
-		return info, fmt.Errorf("cannot push from detached HEAD; check out a branch first")
-	}
-	info.Branch = head.Name().Short()
+	info.Branch = branch
 	cfg, err := r.repo.Config()
 	if err != nil {
 		return info, err
@@ -61,14 +73,10 @@ func (r *Repository) PushToRemotes(remotes []string, pushTags bool) error {
 	if len(remotes) == 0 {
 		return fmt.Errorf("select at least one remote to push to")
 	}
-	head, err := r.repo.Head()
+	branch, err := r.currentPushBranch()
 	if err != nil {
 		return err
 	}
-	if !head.Name().IsBranch() {
-		return fmt.Errorf("cannot push from detached HEAD; check out a branch first")
-	}
-	branch := head.Name().Short()
 	cfg, err := r.repo.Config()
 	if err != nil {
 		return err
