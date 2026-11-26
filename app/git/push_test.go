@@ -256,3 +256,44 @@ func TestPushToRemotesFailedPushDoesNotSetTracking(t *testing.T) {
 		t.Fatalf("auth error lost the remote name: %v", err)
 	}
 }
+
+// A worktree switch only changes the CLI working directory; the shared go-git
+// repository object still points at the main worktree. Push must therefore
+// resolve the branch from the selected worktree, like CurrentBranch does,
+// otherwise it publishes the main worktree's branch and leaves the selected
+// branch unpublished without any error.
+func TestPushUsesSelectedWorktreeAfterSwitchPath(t *testing.T) {
+	dir := initRepo(t)
+	remote := t.TempDir()
+	pushGit(t, remote, "init", "--bare")
+	pushGit(t, dir, "remote", "add", "origin", remote)
+	mainBranch := pushGit(t, dir, "rev-parse", "--abbrev-ref", "HEAD")
+	pushGit(t, dir, "push", "origin", mainBranch)
+
+	linked := filepath.Join(t.TempDir(), "linked")
+	pushGit(t, dir, "worktree", "add", "-b", "linked", linked)
+	addCommit(t, linked, "linked.txt", "linked\n", "commit in linked worktree")
+
+	repo, err := git.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo.SwitchPath(linked)
+	info, err := repo.GetPushInfo()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Branch != "linked" {
+		t.Fatalf("push info branch = %q, want %q", info.Branch, "linked")
+	}
+	if err := repo.PushToRemotes([]string{"origin"}, false); err != nil {
+		t.Fatal(err)
+	}
+	want := pushGit(t, linked, "rev-parse", "HEAD")
+	if got := pushGit(t, remote, "rev-parse", "refs/heads/linked"); got != want {
+		t.Fatalf("remote linked = %s, want %s", got, want)
+	}
+	if got := remoteRefs(t, remote); !strings.Contains(got, "refs/heads/linked") {
+		t.Fatalf("selected worktree branch not published: %q", got)
+	}
+}
