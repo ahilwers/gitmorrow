@@ -29,6 +29,8 @@ vi.mock('@/components/shared/CommandPalette', () => ({ default: () => null }))
 describe('unrestricted application access', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Each test starts without a remembered session from the previous one.
+    localStorage.clear()
     useGitStore.setState({ activeView: 'history', activeRepo: '/repo', recentRepos: [], flash: null, showSidebar: true })
   })
 

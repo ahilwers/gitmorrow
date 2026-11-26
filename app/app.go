@@ -809,7 +809,9 @@ func (a *App) SwitchWorktree(wtPath string) error {
 	if a.repo == nil {
 		return gitpkg.ErrNotARepo
 	}
-	a.repo.SwitchPath(wtPath)
+	if err := a.repo.SwitchWorktree(wtPath); err != nil {
+		return err
+	}
 	_ = a.watcher.Watch(wtPath)
 	a.emitRepoChanged(wtPath)
 	return nil
