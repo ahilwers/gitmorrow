@@ -12,6 +12,8 @@
 package git
 
 import (
+	"fmt"
+	"os"
 	"strings"
 	"sync"
 )
@@ -40,6 +42,24 @@ func (r *Repository) ListWorktrees() ([]WorktreeInfo, error) {
 	wg.Wait()
 
 	return worktrees, nil
+}
+
+// SwitchWorktree points the repository at another worktree.
+//
+// A worktree directory can disappear between sessions (removed by hand or by
+// git), and switching to it would leave every later Git call running in a
+// directory that does not exist. The path is therefore validated first and a
+// missing directory is reported instead of being accepted silently.
+func (r *Repository) SwitchWorktree(wtPath string) error {
+	info, err := os.Stat(wtPath)
+	if err != nil {
+		return fmt.Errorf("worktree %s: %w", wtPath, err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("worktree %s is not a directory", wtPath)
+	}
+	r.Path = wtPath
+	return nil
 }
 
 // AddWorktree creates a new linked worktree at path checked out to branch.

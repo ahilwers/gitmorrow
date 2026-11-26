@@ -261,6 +261,58 @@ func TestPruneWorktrees(t *testing.T) {
 	}
 }
 
+// --- SwitchWorktree ---
+
+func TestSwitchWorktree_ExistingDirectory(t *testing.T) {
+	dir := initRepo(t)
+	addBranch(t, dir, "feature/wt-switch")
+	repo := openRepo(t, dir)
+
+	wtPath := filepath.Join(t.TempDir(), "linked-wt")
+	if err := repo.AddWorktree(wtPath, "feature/wt-switch"); err != nil {
+		t.Fatalf("AddWorktree: %v", err)
+	}
+	if err := repo.SwitchWorktree(wtPath); err != nil {
+		t.Fatalf("SwitchWorktree: %v", err)
+	}
+	if repo.Path != wtPath {
+		t.Errorf("Path = %q, want %q", repo.Path, wtPath)
+	}
+}
+
+func TestSwitchWorktree_MissingDirectory(t *testing.T) {
+	dir := initRepo(t)
+	repo := openRepo(t, dir)
+	missing := filepath.Join(t.TempDir(), "gone")
+
+	err := repo.SwitchWorktree(missing)
+	if err == nil {
+		t.Fatal("expected an error for a missing worktree directory")
+	}
+	if !strings.Contains(err.Error(), "gone") {
+		t.Errorf("error should name the path, got %q", err)
+	}
+	if repo.Path != dir {
+		t.Errorf("Path changed to %q although the switch failed", repo.Path)
+	}
+}
+
+func TestSwitchWorktree_NotADirectory(t *testing.T) {
+	dir := initRepo(t)
+	repo := openRepo(t, dir)
+	file := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(file, []byte("x"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := repo.SwitchWorktree(file); err == nil {
+		t.Fatal("expected an error for a file that is not a directory")
+	}
+	if repo.Path != dir {
+		t.Errorf("Path changed to %q although the switch failed", repo.Path)
+	}
+}
+
 // --- helpers ---
 
 // openRepo opens the repository at dir using the git package under test.

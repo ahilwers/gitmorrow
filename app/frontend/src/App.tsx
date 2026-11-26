@@ -17,6 +17,7 @@ import { SaveWindowSize, GetRecentRepos } from '@bindings/gitmorrow/app'
 import { useGitStore } from '@/stores/gitStore'
 import { useKeyboard } from '@/hooks/useKeyboard'
 import { useResizableWidth } from '@/hooks/useResizableWidth'
+import { useSessionRestore } from '@/hooks/useSessionRestore'
 import Toolbar from '@/components/Toolbar/Toolbar'
 import Sidebar from '@/components/Sidebar/Sidebar'
 import HistoryView from '@/components/HistoryView/HistoryView'
@@ -141,6 +142,9 @@ export default function App() {
 
   // Global keyboard shortcuts (⌘K, ⌘1, ⌘2)
   useKeyboard()
+
+  // Reopen the repository and worktree of the previous session.
+  useSessionRestore()
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden"
