@@ -30,6 +30,7 @@ import { OpenInFinder } from '@bindings/gitmorrow/app'
 import { useStatus } from '@/hooks/useStatus'
 import { useCherryPick } from '@/hooks/useCherryPick'
 import { parseGitError } from '@/lib/format'
+import { copyText } from '@/lib/clipboard'
 import type { WorktreeInfo, Branch, Tag, StashEntry } from '@/lib/types'
 
 type PendingConfirm =
@@ -93,6 +94,11 @@ export default function Sidebar({ width = 200 }: SidebarProps) {
       if (!next.tags)     setTagFilter('')
       return next
     })
+  }
+
+  const copyBranchName = async (name: string) => {
+    const copied = await copyText(name)
+    showFlash(copied ? t('branch.copied') : t('branch.copyFailed'), copied ? 'success' : 'danger')
   }
 
   const beginDelete = (branch: Branch, isRemote: boolean) => {
@@ -325,12 +331,15 @@ export default function Sidebar({ width = 200 }: SidebarProps) {
             </div>
           )}
           {localVisible.map(b => {
+            const copyItem = { label: t('branch.copyName'), onClick: () => void copyBranchName(b.name) }
             const contextItems = b.isHead
-              ? []
+              ? [copyItem]
               : [
                   { label: `Merge '${b.name}' into '${currentBranch}'`, onClick: () => setMergingBranch(b.name) },
                   { type: 'separator' as const },
                   { label: `Switch to '${b.name}'`, onClick: () => setPending({ kind: 'checkout', branch: b.name }) },
+                  { type: 'separator' as const },
+                  copyItem,
                   { type: 'separator' as const },
                   { label: t('deleteBranch.localMenu'), destructive: true, onClick: () => beginDelete(b, false) },
                 ]
@@ -392,7 +401,6 @@ export default function Sidebar({ width = 200 }: SidebarProps) {
               />
             )
 
-            if (contextItems.length === 0) return item
             return (
               <ContextMenu key={b.name} items={contextItems}>
                 <div>{item}</div>
@@ -428,6 +436,8 @@ export default function Sidebar({ width = 200 }: SidebarProps) {
                   ]
               ),
               ...(currentBranch && currentBranch !== localName ? [{ label: `Pull into '${currentBranch}'`, onClick: () => setPending({ kind: 'pullIntoCurrent' as const, remote: b.remote, branch: localName, currentBranch }) }] : []),
+              { type: 'separator' as const },
+              { label: t('branch.copyName'), onClick: () => void copyBranchName(b.name) },
               ...(!b.isHead ? [
                 { type: 'separator' as const },
                 { label: t('deleteBranch.remoteMenu'), destructive: true, onClick: () => beginDelete(b, true) },
