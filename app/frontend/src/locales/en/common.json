@@ -45,6 +45,11 @@
     "pending": "Deleting…",
     "cancel": "Cancel"
   },
+  "branch": {
+    "copyName": "Copy branch name",
+    "copied": "Branch name copied",
+    "copyFailed": "Could not copy the branch name"
+  },
   "sidebar": {
     "branches": "Branches",
     "remotes": "Remote",

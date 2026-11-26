@@ -40,6 +40,11 @@
     "pending": "Wird gel\u00f6scht\u2026",
     "cancel": "Abbrechen"
   },
+  "branch": {
+    "copyName": "Branchname kopieren",
+    "copied": "Branchname kopiert",
+    "copyFailed": "Branchname konnte nicht kopiert werden"
+  },
   "sidebar": {
     "branches": "Branches",
     "remotes": "Remote",

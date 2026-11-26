@@ -28,6 +28,8 @@ import { NewBranchDialog } from '@/components/BranchManager/NewBranchDialog'
 import { CreateStashDialog } from '@/components/StashView/CreateStashDialog'
 import { CreateTagDialog } from '@/components/TagManager/CreateTagDialog'
 import { WorktreeSelector } from './WorktreeSelector'
+import { ContextMenu } from '@/components/shared/ContextMenu'
+import { copyText } from '@/lib/clipboard'
 
 import { PullStrategyDialog } from './PullStrategyDialog'
 import type { PullSnapshot, PushInfo } from '@bindings/gitmorrow/git'
@@ -101,6 +103,30 @@ export default function Toolbar() {
   const branchDescription = branch === 'HEAD' ? branchLabel : t('toolbar.currentBranch', { branch })
   const pushCount = branch && branch !== 'HEAD' && status && Number.isFinite(status.ahead) ? Math.max(0, status.ahead) : 0
   const pushDescription = pushCount > 0 ? t('toolbar.pushPending', { count: pushCount }) : undefined
+
+  const copyCurrentBranch = async () => {
+    if (!branch || branch === 'HEAD') return
+    const copied = await copyText(branch)
+    showFlash(copied ? t('branch.copied') : t('branch.copyFailed'), copied ? 'success' : 'danger')
+  }
+
+  const currentBranchStatus = branch ? (
+    <div
+      role="status"
+      aria-label={branchDescription}
+      title={branchDescription}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 5,
+        minWidth: 0, maxWidth: 240, fontSize: 12,
+        color: branch === 'HEAD' ? 'var(--warn)' : 'var(--text-sec)',
+      }}
+    >
+      <GitBranch size={13} aria-hidden="true" style={{ flexShrink: 0 }} />
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {branchLabel}
+      </span>
+    </div>
+  ) : null
 
   const handleOpenRepo = async (path: string) => {
     try {
@@ -391,23 +417,11 @@ export default function Toolbar() {
       {/* Current branch stays visible in every view, including during Git operations. */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <WorktreeSelector />
-        {branch && (
-          <div
-            role="status"
-            aria-label={branchDescription}
-            title={branchDescription}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              minWidth: 0, maxWidth: 240, fontSize: 12,
-              color: branch === 'HEAD' ? 'var(--warn)' : 'var(--text-sec)',
-            }}
-          >
-            <GitBranch size={13} aria-hidden="true" style={{ flexShrink: 0 }} />
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {branchLabel}
-            </span>
-          </div>
-        )}
+        {currentBranchStatus && (branch === 'HEAD' ? currentBranchStatus : (
+          <ContextMenu items={[{ label: t('branch.copyName'), onClick: () => void copyCurrentBranch() }]}>
+            {currentBranchStatus}
+          </ContextMenu>
+        ))}
         {(fetchLoading || pullLoading || pushLoading) && (
           <span style={{
             display: 'flex', alignItems: 'center', gap: 6,
